@@ -1,77 +1,73 @@
-## tensorflow seq2seq chatbot
+# tensorflow chatbot
+### (with seq2seq + attention + beam search + anti-LM)
 
-Build a general-purpose conversational chatbot based on a hot 
-seq2seq approach implemented in [tensorflow](https://www.tensorflow.org/versions/master/tutorials/seq2seq/index.html#sequence-to-sequence_basics).
-Since it doesn't produce good results so far, also consider other implementations of [seq2seq](https://github.com/nicolas-ivanov/seq2seq_chatbot_links).
 
-The current results are pretty lousy:
+## Briefing
+This is a [seq2seq model](http://arxiv.org/abs/1406.1078) modified from [tensorflow example](https://www.tensorflow.org/versions/r0.10/tutorials/seq2seq/index.html), while:  
 
-    hello baby	        - hello
-    how old are you ?   - twenty .
-    i am lonely	        - i am not
-    nice                - you ' re not going to be okay .
-    so rude	            - i ' m sorry .
+
+1. The original tensorflow seq2seq has [attention mechanism](http://arxiv.org/abs/1412.7449) out of box.
+2. This work add option to do [beam search](https://en.wikipedia.org/wiki/Beam_search) in decoding procedure, which supposed to find better results.
+3. This work also add [anti-language model](https://arxiv.org/abs/1510.03055) to suppress the generic response problem of intrinsic seq2seq model.
+4. A simple [Flask]() server (app.py) is included, which is used to be a Facebook Messenger App backend.
+
+
+## (tl;dr) Just tell me how it works
+
+Download this repository
+
+    git clone github.com/Marsan-Ma/tf_chatbot_seq2seq_antilm.git
     
-Disclaimer: 
+Training the model
 
-* the answers are hand-picked (it looks cooler that way)
-* chatbot has no power to follow the conversation line so far; in the example above it's a just a coincidence (hand-picked one)
+    cd tf_chatbot_antilm
+    python3 main.py --mode train --model_name movie_lines_selected
+    
+Run some test example and see the bot response
 
-Everyone is welcome to investigate the code and suggest the improvements.
+    python3 main.py --mode test --model_name movie_lines_selected
 
-**Actual deeds**
+Start your Facebook Messenger backend server
 
-* realise how to diversify chatbot answers (currently the most probable one is picked and it's dull)
+    python3 app.py
 
+You may see my standalone [fb_messenger]() repository, it will explain more about details such as SSL, webhook, work-around of known bug.
 
-**Papers**
+## Introduction
 
-* [Sequence to Sequence Learning with Neural Networks](http://papers.nips.cc/paper/5346-sequence-to-sequence-learning-with-neural-networks.pdf)
-* [A Neural Conversational Model](http://arxiv.org/pdf/1506.05869v1.pdf)
+Seq2seq is a great model released by Google in 2014, by [ et al](). At first it's used to do the machine translation, and easily out-performed the traditional statistical + rule based MT model.
 
-**Nice picture**
+Here is the classic intro picture of seq2seq model from [blogpost of gmail auto-reply feature](http://googleresearch.blogspot.ru/2015/11/computer-respond-to-this-email.html).
 
 [![seq2seq](https://4.bp.blogspot.com/-aArS0l1pjHQ/Vjj71pKAaEI/AAAAAAAAAxE/Nvy1FSbD_Vs/s640/2TFstaticgraphic_alt-01.png)](http://4.bp.blogspot.com/-aArS0l1pjHQ/Vjj71pKAaEI/AAAAAAAAAxE/Nvy1FSbD_Vs/s1600/2TFstaticgraphic_alt-01.png)
 
-Curtesy of [this](http://googleresearch.blogspot.ru/2015/11/computer-respond-to-this-email.html) article.
 
-**Setup**
+Soon people find that anything about "mapping something to another thing" could be magically achieved by seq2seq model. Chatbot is just one of these amazing application, which we consider consecutive dialog as such kind of "mapping" relationship.
 
-    git clone git@github.com:nicolas-ivanov/tf_seq2seq_chatbot.git
-    cd tf_seq2seq_chatbot
-    bash setup.sh
-    
-**Run**
+There is a known problem about seq2seq chatbot: since we train 
+the model with MLE (maximum likelyhood estimation) as our object function, which make sense for machine translation, but not good for chatbot.
 
-Train a seq2seq model on a small (17 MB) corpus of movie subtitles:
+While we talk to each other, we are not expecting a generic reponse like "me too", "I think so", "I love you" since these are not informative. Here we reproduce the work of [Li. et al ](http://arxiv.org/pdf/1510.03055v3.pdf) from stanford and microsoft research which try to solve this problem.
 
-    python train.py
-    
-(this command will run the training on a CPU... GPU instructions are coming)
+The main idea is that: using the same seq2seq model as a language model to get the words with high probability as a anti-model, then we penalize these words with generic high probability by this anti-model to get more special, informative response.
 
-Test trained trained model on a set of common questions:
+The original work use [MERT]() with [BLEU]() as metrics to find the best weight of the probability of vanilla seq2seq model and the proposed anti-language model. But here I find the bleu score often being zero, thus we can't has meaningful result here. I am not sure this part make sense, if anyone has idea about this, please mail me thanks!
 
-    python test.py
-    
-Chat with trained model in console:
 
-    python chat.py
-    
-All configuration params are stored at `tf_seq2seq_chatbot/configs/config.py`
+## Requirements
 
-**GPU usage**
+1. For training, GPU is recommended. Seq2seq is a large model, you might need certain computing power to do the training and predicting efficiently, especially when you set the beam-search size large.
 
-If you are lucky to have a proper gpu configuration for tensorflow already, this should do the job:
+2. DRAM requirement is not strict as CPU/GPU, since we are doing stochastic gradient decent.
 
-    python train.py
-    
-Otherwise you may need to build tensorflow from source and run the code as follows:
+3. If you are new to deep-learning, setting-up things like GPU, python environment is annoying to you, here are dockers of my machine learning environment:  
+  [(non-gpu version docker)](https://github.com/Marsan-Ma/docker_mldm)  
+  [(gpu version docker)](https://github.com/Marsan-Ma/docker_mldm_gpu)  
 
-    cd tensorflow  # cd to the tensorflow source folder
-    cp -r ~/tf_seq2seq_chatbot ./  # copy project's code to tensorflow root
-    bazel build -c opt --config=cuda tf_seq2seq_chatbot:train  # build with gpu-enable option
-    ./bazel-bin/tf_seq2seq_chatbot/train  # run the built code
 
-**Requirements**
+## References
 
-* [tensorflow](https://www.tensorflow.org/versions/master/get_started/os_setup.html)
+1. To understand seq2seq and language model, we need to understand LSTM first. This work [sherjilozair/char-rnn-tensorflow](https://github.com/sherjilozair/char-rnn-tensorflow) helps me learns a lot, if you are new to language model, I suggest you try this work first.
+
+2. Here is the seq2seq+attention only work: [nicolas-ivanov/tf_seq2seq_chatbot](https://github.com/nicolas-ivanov/tf_seq2seq_chatbot). This will help you figure out the main flow of vanilla seq2seq model.
+

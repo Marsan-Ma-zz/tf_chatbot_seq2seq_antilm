@@ -15,7 +15,8 @@ PY3='stdbuf -o0 nohup python3 -u'
 
 # -----[movie_lines_selected]-----
 # python3 main.py --mode train --model_name movie_lines_selected --vocab_size 80000
-$PY3 main.py --mode train --model_name movie_lines_selected --vocab_size 80000 > "./logs/seq2seq_movie_lines_selected_$NOW.log" &
+python3 main.py --mode test --model_name movie_lines_selected --vocab_size 80000
+# $PY3 main.py --mode train --model_name movie_lines_selected --vocab_size 80000 > "./logs/seq2seq_movie_lines_selected_$NOW.log" &
 
 # -----[lyrics_zh]-----
 # python3 main.py --mode train --model_name lyrics_zh

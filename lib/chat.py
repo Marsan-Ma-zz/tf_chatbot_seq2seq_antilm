@@ -3,9 +3,8 @@ import sys
 
 import tensorflow as tf
 
-# from tf_seq2seq_chatbot.configs.config import FLAGS
-from tf_seq2seq_chatbot.lib import data_utils
-from tf_seq2seq_chatbot.lib.seq2seq_model_utils import create_model, get_predicted_sentence
+from lib import data_utils
+from lib.seq2seq_model_utils import create_model, get_predicted_sentence
 
 
 def chat(args):

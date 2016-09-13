@@ -3,8 +3,8 @@ import os
 import tensorflow as tf
 from datetime import datetime
 
-from tf_seq2seq_chatbot.lib import data_utils
-from tf_seq2seq_chatbot.lib.seq2seq_model_utils import create_model, get_predicted_sentence
+from lib import data_utils
+from lib.seq2seq_model_utils import create_model, get_predicted_sentence
 
 
 def predict(args, debug=False):
@@ -19,7 +19,7 @@ def predict(args, debug=False):
     with tf.Session() as sess, open(results_path, 'w') as results_fh:
         # Create model and load parameters.
         args.batch_size = 1  # We decode one sentence at a time.
-        model = create_model(sess, args, forward_only=True, force_dec_input=False)
+        model = create_model(sess, args, forward_only=True, force_dec_input=True)
 
         # Load vocabularies.
         vocab_path = os.path.join(args.data_dir, "vocab%d.in" % args.vocab_size)
@@ -29,9 +29,17 @@ def predict(args, debug=False):
 
         for sentence in test_dataset:
             # Get token-ids for the input sentence.
-            predicted_sentence = get_predicted_sentence(args, sentence, vocab, rev_vocab, model, sess)
-            print(sentence, ' -> ', predicted_sentence)
+            predicted_sentence = get_predicted_sentence(args, sentence, vocab, rev_vocab, model, sess, debug=debug)
+            if isinstance(predicted_sentence, list):
+                print("%s : (%s)" % (sentence, datetime.now()))
+                results_fh.write("%s : (%s)" % (sentence, datetime.now()))
+                for sent in predicted_sentence:
+                    print("  (%s) -> %s" % (sent['prob'], sent['dec_inp']))
+                    results_fh.write("  (%f) -> %s" % (sent['prob'], sent['dec_inp']))
+            else:
+                print(sentence, ' -> ', predicted_sentence)
+                results_fh.write("%s -> %s\n" % (sentence, predicted_sentence))
+            # break
 
-            results_fh.write(predicted_sentence + '\n')
     results_fh.close()
     print("results written in %s" % results_path)

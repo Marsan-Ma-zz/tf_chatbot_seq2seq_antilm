@@ -56,7 +56,7 @@ class Seq2SeqModel(object):
                use_lstm=False,
                num_samples=512,
                forward_only=False,
-               #force_dec_input=False,
+               force_dec_input=False,
                scope_name='seq2seq',
                dtype=tf.float32):
     """Create the model.
@@ -158,7 +158,7 @@ class Seq2SeqModel(object):
         self.outputs, self.losses = tf.nn.seq2seq.model_with_buckets(
             self.encoder_inputs, self.decoder_inputs, targets,
             self.target_weights, buckets, 
-            lambda x, y: seq2seq_f(x, y, True),
+            lambda x, y: seq2seq_f(x, y, (not force_dec_input)),
             softmax_loss_function=softmax_loss_function)
         # If we use output projection, we need to project outputs for decoding.
         if output_projection is not None:
