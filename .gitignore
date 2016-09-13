@@ -1,0 +1,4 @@
+sftp-config.json
+*.pyc
+works/*
+!works/movie_lines_selected
