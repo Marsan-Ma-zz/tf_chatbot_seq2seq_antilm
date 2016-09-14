@@ -29,7 +29,7 @@ This is a [seq2seq model](http://arxiv.org/abs/1406.1078) modified from [tensorf
 
 #### Start your Facebook Messenger backend server
 
-    python3 app.py
+    python3 app.py --model_name lyrics_ptt
 
 You may see the standalone [fb_messenger](https://github.com/Marsan-Ma/fb_messenger) repository for more details such as SSL, webhook, work-around of known bug.
 
