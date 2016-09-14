@@ -9,30 +9,41 @@ This is a [seq2seq model](http://arxiv.org/abs/1406.1078) modified from [tensorf
 1. The original tensorflow seq2seq has [attention mechanism](http://arxiv.org/abs/1412.7449) out-of-box.
 2. This work add option to do [beam search](https://en.wikipedia.org/wiki/Beam_search) in decoding procedure, which supposed to find better results.
 3. This work add [anti-language model](https://arxiv.org/abs/1510.03055) to suppress the generic response problem of intrinsic seq2seq model.
-4. A simple [Flask]() server (app.py) is included, which means to be a Facebook Messenger App backend.
+4. A simple [Flask](http://flask.pocoo.org/) server `app.py` is included, which used to be a Facebook Messenger App backend.
 
 
 ## Just tell me how it works
 
-Clone the repository
+#### Clone the repository
 
     git clone github.com/Marsan-Ma/tf_chatbot_seq2seq_antilm.git
     
-Train the model
+#### Train the model
 
     cd tf_chatbot_antilm
-    python3 main.py --mode train --model_name movie_lines_selected
+    python3 main.py --mode train --model_name lyrics_ptt
     
-Run some test example and see the bot response
+#### Run some test example and see the bot response
 
-    python3 main.py --mode test --model_name movie_lines_selected
+    python3 main.py --mode test --model_name lyrics_ptt
 
-Start your Facebook Messenger backend server
+#### Start your Facebook Messenger backend server
 
     python3 app.py
 
 You may see the standalone [fb_messenger](https://github.com/Marsan-Ma/fb_messenger) repository for more details such as SSL, webhook, work-around of known bug.
 
+
+### Want different corpus for different model?
+You may find other corpus such as open movie subtitle, or forums from [this repository](https://github.com/Marsan-Ma/chat_corpus). You need to put it under path like:  
+
+    works/<YOUR_MODEL_NAME>/data/train/chat.txt
+
+And hand craft some testing sentences (each sentence per line) in:
+
+    works/<YOUR_MODEL_NAME>/data/test/test_set.txt
+    
+    
 ## Introduction
 
 Seq2seq is a great model released by [Cho et al., 2014](http://arxiv.org/abs/1406.1078). At first it's used to do machine translation, and soon people find that anything about **mapping something to another thing** could be also achieved by seq2seq model. Chatbot is one of these miracles, where we consider consecutive dialog as such kind of "mapping" relationship.
@@ -46,7 +57,7 @@ But the problem is, so far we haven't find a better objective function for charb
 
 These responses are not informative, but they do have large probability --- since they tend to appear many times in training corpus. We don't won't our chatbot always replying these noncense, so we need to find some way to make our bot more "interesting", technically speaking, to increase the "perplexity" of reponse.
 
-Here we reproduce the work of [Li. et al](http://arxiv.org/pdf/1510.03055v3.pdf) try to solve this problem. The main idea is using the same seq2seq model as a language model, to get the candidate words with high probability in each decoding timestamp as a anti-model, then we penalize these words always being high probability for any input. By this anti-model, we could get more special, non-generic, informative response.
+Here we reproduce the work of [Li. et al., 2016](http://arxiv.org/pdf/1510.03055v3.pdf) try to solve this problem. The main idea is using the same seq2seq model as a language model, to get the candidate words with high probability in each decoding timestamp as a anti-model, then we penalize these words always being high probability for any input. By this anti-model, we could get more special, non-generic, informative response.
 
 The original work of [Li. et al](http://arxiv.org/pdf/1510.03055v3.pdf) use [MERT (Och, 2003)](http://delivery.acm.org/10.1145/1080000/1075117/p160-och.pdf) with [BLEU](https://en.wikipedia.org/wiki/BLEU) as metrics to find the best probability weighting (the **λ** and **γ** in
 **Score(T) = p(T|S) − λU(T) + γNt**) of the corresponding anti-language model. But I find that BLEU score in chat corpus tend to always being zero, thus can't get meaningful result here. If anyone has any idea about this, drop me a message, thanks!

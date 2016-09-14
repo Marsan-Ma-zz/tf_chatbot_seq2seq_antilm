@@ -1,4 +1,5 @@
 sftp-config.json
 *.pyc
 works/*
-!works/movie_lines_selected
+!works/lyrics_ptt
+go_train.sh

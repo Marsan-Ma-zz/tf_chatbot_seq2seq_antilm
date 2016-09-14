@@ -1,4 +1,4 @@
-import sys, os, math, time, argparse, shutil
+import sys, os, math, time, argparse, shutil, gzip
 import numpy as np
 import tensorflow as tf
 
@@ -14,8 +14,17 @@ def setup_workpath(workspace):
     if not os.path.exists(wp): os.mkdir(wp)
 
   data_dir = "%s/data" % (workspace)
-  shutil.copyfile("%s/train/chat.txt" % data_dir, "%s/chat.in" % data_dir)
-  shutil.copyfile("%s/train/chat_10k.txt" % data_dir, "%s/chat_test.in" % data_dir)
+  # training data
+  if not os.path.exists("%s/chat.in" % data_dir):
+    n = 0
+    f_zip   = gzip.open("%s/train/chat.txt.gz" % data_dir, 'rt')
+    f_train = open("%s/chat.in" % data_dir, 'w')
+    f_dev   = open("%s/chat_test.in" % data_dir, 'w')
+    for line in f_zip:
+      f_train.write(line)
+      if n < 10000: 
+        f_dev.write(line)
+        n += 1
 
 
 def train(args):
