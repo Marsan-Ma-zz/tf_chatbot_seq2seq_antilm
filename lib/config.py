@@ -19,8 +19,14 @@ def params_setup(cmdline=None):
   parser.add_argument('--size', type=int, default=128, help='Size of each model layer.')
   parser.add_argument('--num_layers', type=int, default=4, help='Number of layers in the model.')
 
-  parser.add_argument('--max_train_data_size', type=int, default=0, help='Limit on the size of training data (0: no limit).')
-  parser.add_argument('--steps_per_checkpoint', type=int, default=10000, help='How many training steps to do per checkpoint.')
+  parser.add_argument('--max_train_data_size', type=int, default=0, help='Limit on the size of training data (0: no limit)')
+  parser.add_argument('--steps_per_checkpoint', type=int, default=10000, help='How many training steps to do per checkpoint')
+
+  # predicting params
+  parser.add_argument('--beam_size', type=int, default=10, help='beam search size')
+  parser.add_argument('--antilm', type=float, default=0, help='anti-language model weight')
+  parser.add_argument('--n_bonus', type=int, default=0, help='bonus with sentence length')
+
 
   if cmdline:
     args = parser.parse_args(cmdline)

@@ -72,7 +72,7 @@ def cal_bleu(cands, ref, stopwords=['的', '嗎']):
     
 
 
-def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, debug=False, antilm=0, n_bonus=0, beam_size=5):
+def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, debug=False):
     def model_step(enc_inp, dec_inp, dptr, target_weights, bucket_id):
       _, _, logits = model.step(sess, enc_inp, dec_inp, target_weights, bucket_id, forward_only=True, debug=debug)
       prob = softmax(logits[dptr][0])
@@ -97,7 +97,7 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
     for dptr in range(len(decoder_inputs)-1):
       if dptr > 0: 
         target_weights[dptr] = [1.]
-        beams, new_beams = new_beams[:beam_size], []
+        beams, new_beams = new_beams[:args.beam_size], []
       if debug: print("=====[beams]=====", beams)
       heapq.heapify(beams)  # since we will remove something
       for prob, cand in beams:
@@ -109,29 +109,40 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
         if debug: print(cand['prob'], " ".join([dict_lookup(rev_vocab, w) for w in cand['dec_inp']]))
 
         all_prob_ts = model_step(encoder_inputs, cand['dec_inp'], dptr, target_weights, bucket_id)
-        # anti-lm
-        all_prob_t  = model_step(dummy_encoder_inputs, cand['dec_inp'], dptr, target_weights, bucket_id)
-        # adjusted probability
-        all_prob    = all_prob_ts - antilm * all_prob_t + n_bonus * dptr + random() * 1e-50
+        if args.antilm:
+          # anti-lm
+          all_prob_t  = model_step(dummy_encoder_inputs, cand['dec_inp'], dptr, target_weights, bucket_id)
+          # adjusted probability
+          all_prob    = all_prob_ts - args.antilm * all_prob_t + args.n_bonus * dptr + random() * 1e-50
+        else:
+          all_prob_t  = [0]*len(all_prob_ts)
+          all_prob    = all_prob_ts
 
-        # beam search
-        for c in np.argsort(all_prob)[::-1][:beam_size]:
-          new_cand = {
-            'eos'     : (c == data_utils.EOS_ID),
-            'dec_inp' : [(np.array([c]) if i == (dptr+1) else k) for i, k in enumerate(cand['dec_inp'])],
-            'prob_ts' : cand['prob_ts'] * all_prob_ts[c],
-            'prob_t'  : cand['prob_t'] * all_prob_t[c],
-            'prob'    : cand['prob'] * all_prob[c],
-          }
-          new_cand = (new_cand['prob'], new_cand) # for heapq can only sort according to list[0]
-          
-          if (len(new_beams) < beam_size):
-            heapq.heappush(new_beams, new_cand)
-            # print("new_beam push", new_cand)
-          elif (new_cand[0] > new_beams[0][0]):
-            heapq.heapreplace(new_beams, new_cand)
-            # print("new_beam replace", new_cand)
-    results += new_beams  # last cands
+        
+        # greddy search
+        if args.beam_size == 1:
+          # [TODO]
+          pass
+        # beam search  
+        else:
+          for c in np.argsort(all_prob)[::-1][:args.beam_size]:
+            new_cand = {
+              'eos'     : (c == data_utils.EOS_ID),
+              'dec_inp' : [(np.array([c]) if i == (dptr+1) else k) for i, k in enumerate(cand['dec_inp'])],
+              'prob_ts' : cand['prob_ts'] * all_prob_ts[c],
+              'prob_t'  : cand['prob_t'] * all_prob_t[c],
+              'prob'    : cand['prob'] * all_prob[c],
+            }
+            new_cand = (new_cand['prob'], new_cand) # for heapq can only sort according to list[0]
+            
+            if (len(new_beams) < args.beam_size):
+              heapq.heappush(new_beams, new_cand)
+              # print("new_beam push", new_cand)
+            elif (new_cand[0] > new_beams[0][0]):
+              heapq.heapreplace(new_beams, new_cand)
+              # print("new_beam replace", new_cand)
+    
+    results += new_beams  # flush last cands
 
     # post-process results
     res_cands = []
