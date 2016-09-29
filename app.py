@@ -1,7 +1,7 @@
 # coding: utf-8
 import os, json, yaml, requests, jieba
 from datetime import datetime
-from flask import Flask, request
+from flask import Flask, request, render_template
 from OpenSSL import SSL
 from random import random, choice
 
@@ -23,10 +23,11 @@ class ChatBot(object):
 
         # flow ctrl
         self.args = args
-        self.sess = tf.InteractiveSession()
         self.debug = debug
         self.fbm_processed = []
-
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=args.gpu_usage)
+        self.sess = tf.InteractiveSession(config=tf.ConfigProto(gpu_options=gpu_options))
+        
         # Create model and load parameters.
         self.args.batch_size = 1  # We decode one sentence at a time.
         self.model = create_model(self.sess, self.args, forward_only=True, force_dec_input=True)
@@ -61,8 +62,19 @@ class ChatBot(object):
         raw = get_predicted_sentence(self.args, sent, self.vocab, self.rev_vocab, self.model, self.sess, debug=False)
         # find bests candidates
         cands = sorted(raw, key=lambda v: v['prob'], reverse=True)[:max_cand]
-        cands = [[w for w in r['dec_inp'].split() if w[0] != '_'] for r in cands]
-        return ' '.join(choice(cands)) or 'No comment'
+        
+        if max_cand == -1:  # return all cands for debug
+            cands = [(r['prob'], ' '.join([w for w in r['dec_inp'].split() if w[0] != '_'])) for r in cands]
+            return cands
+        else:
+            cands = [[w for w in r['dec_inp'].split() if w[0] != '_'] for r in cands]
+            return ' '.join(choice(cands)) or 'No comment'
+
+
+    def gen_response_debug(self, sent, args=None):
+        sent = " ".join([w.lower() for w in jieba.cut(sent) if w not in [' ']])
+        raw = get_predicted_sentence(args, sent, self.vocab, self.rev_vocab, self.model, self.sess, debug=False, return_raw=True)
+        return raw
 
 
     #------------------------------
@@ -94,18 +106,28 @@ class ChatBot(object):
 #---------------------------
 #   Server
 #---------------------------
-@app.route('/', methods=['GET'])
+@app.route('/chat', methods=['GET'])
 def verify():
-    if request.args.get('hub.verify_token', '') == self.VERIFY_TOKEN:
+    if request.args.get('hub.verify_token', '') == chatbot.VERIFY_TOKEN:
         return request.args.get('hub.challenge', '')
     else:
         return 'Error, wrong validation token'
 
-@app.route('/', methods=['POST'])
-def webhook():
+@app.route('/chat', methods=['POST'])
+def chat():
     payload = request.get_data()
     chatbot.process_fbm(payload)
     return "ok"
+
+
+@app.route('/', methods=['GET'])
+def home():
+    return render_template('index.html')    
+
+
+@app.route('/privacy', methods=['GET'])
+def privacy():
+    return render_template('privacy.html')    
 
 
 #---------------------------

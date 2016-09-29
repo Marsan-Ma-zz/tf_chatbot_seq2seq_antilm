@@ -72,7 +72,7 @@ def cal_bleu(cands, ref, stopwords=['的', '嗎']):
     
 
 
-def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, debug=False):
+def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, debug=False, return_raw=False):
     def model_step(enc_inp, dec_inp, dptr, target_weights, bucket_id):
       _, _, logits = model.step(sess, enc_inp, dec_inp, target_weights, bucket_id, forward_only=True, debug=debug)
       prob = softmax(logits[dptr][0])
@@ -84,8 +84,8 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
     # Which bucket does it belong to?
     bucket_id = min([b for b in range(len(args.buckets)) if args.buckets[b][0] > len(input_token_ids)])
     outputs = []
-
     feed_data = {bucket_id: [(input_token_ids, outputs)]}
+
     # Get a 1-element batch to feed the sentence to the model.
     encoder_inputs, decoder_inputs, target_weights = model.get_batch(feed_data, bucket_id)
     if debug: print("\n[get_batch]\n", encoder_inputs, decoder_inputs, target_weights)
@@ -113,16 +113,21 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
           # anti-lm
           all_prob_t  = model_step(dummy_encoder_inputs, cand['dec_inp'], dptr, target_weights, bucket_id)
           # adjusted probability
-          all_prob    = all_prob_ts - args.antilm * all_prob_t + args.n_bonus * dptr + random() * 1e-50
+          all_prob    = all_prob_ts - args.antilm * all_prob_t #+ args.n_bonus * dptr + random() * 1e-50
         else:
           all_prob_t  = [0]*len(all_prob_ts)
           all_prob    = all_prob_ts
 
+        # suppress copy-cat (respond the same as input)
+        if dptr < len(input_token_ids):
+          all_prob[input_token_ids[dptr]] = all_prob[input_token_ids[dptr]] * 0.01
+
+        # for debug use
+        if return_raw: return all_prob, all_prob_ts, all_prob_t
         
         # greddy search
         if args.beam_size == 1:
-          # [TODO]
-          pass
+          pass # [TODO]
         # beam search  
         else:
           for c in np.argsort(all_prob)[::-1][:args.beam_size]:

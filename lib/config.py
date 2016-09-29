@@ -27,6 +27,8 @@ def params_setup(cmdline=None):
   parser.add_argument('--antilm', type=float, default=0, help='anti-language model weight')
   parser.add_argument('--n_bonus', type=int, default=0, help='bonus with sentence length')
 
+  # environment params
+  parser.add_argument('--gpu_usage', type=float, default=0.5, help='tensorflow gpu memory fraction used')
 
   if cmdline:
     args = parser.parse_args(cmdline)
