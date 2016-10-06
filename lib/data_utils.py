@@ -8,9 +8,6 @@ import os, re, sys, shutil
 from tensorflow.python.platform import gfile
 
 # Special vocabulary symbols - we always put them at the start.
-# from tf_seq2seq_chatbot.configs.config import BUCKETS
-
-
 _PAD = "_PAD"
 _GO = "_GO"
 _EOS = "_EOS"
@@ -68,7 +65,8 @@ def create_vocabulary(vocabulary_path, data_path, max_vocabulary_size,
   if not gfile.Exists(vocabulary_path):
     print("Creating vocabulary %s from data %s" % (vocabulary_path, data_path))
     vocab = {}
-    with gfile.GFile(data_path, mode="rt") as f:
+    # with gfile.GFile(data_path, mode="rt") as f:
+    with gfile.GFile(data_path, mode="r") as f:
       counter = 0
       for line in f:
         # try:
@@ -115,14 +113,11 @@ def initialize_vocabulary(vocabulary_path):
   """
   if gfile.Exists(vocabulary_path):
     rev_vocab = []
-
     with gfile.GFile(vocabulary_path, mode="r") as f:
       rev_vocab.extend(f.readlines())
-
     rev_vocab = [line.strip() for line in rev_vocab]
     vocab = dict([(x, y) for (y, x) in enumerate(rev_vocab)])
     return vocab, rev_vocab
-
   else:
     raise ValueError("Vocabulary file %s not found.", vocabulary_path)
 
@@ -145,6 +140,7 @@ def sentence_to_token_ids(sentence, vocabulary,
   Returns:
     a list of integers, the token-ids for the sentence.
   """
+
   if tokenizer:
     words = tokenizer(sentence)
   else:
@@ -174,15 +170,16 @@ def data_to_token_ids(data_path, target_path, vocabulary_path,
   if not gfile.Exists(target_path):
     print("Tokenizing data in %s" % data_path)
     vocab, _ = initialize_vocabulary(vocabulary_path)
-    with gfile.GFile(data_path, mode="rb") as data_file:
+    # with gfile.GFile(data_path, mode="rb") as data_file:
+    with gfile.GFile(data_path, mode="r") as data_file:
       with gfile.GFile(target_path, mode="w") as tokens_file:
         counter = 0
         for line in data_file:
-          try:
-            line = line.decode('utf8', 'ignore')
-          except Exception as e:
-            print(e, line)
-            continue
+          # try:
+          #   line = line.decode('utf8', 'ignore')
+          # except Exception as e:
+          #   print(e, line)
+          #   continue
           counter += 1
           if counter % 100000 == 0:
             print("  tokenizing line %d" % counter)
@@ -223,7 +220,7 @@ def prepare_dialog_data(data_dir, vocabulary_size):
   return (train_ids_path, dev_ids_path, vocab_path)
 
 
-def read_data(tokenized_dialog_path, buckets, max_size=None):
+def read_data(tokenized_dialog_path, buckets, max_size=None, reversed=False):
   """Read data from source file and put into buckets.
 
   Args:
@@ -241,6 +238,8 @@ def read_data(tokenized_dialog_path, buckets, max_size=None):
 
   with gfile.GFile(tokenized_dialog_path, mode="r") as fh:
       source, target = fh.readline(), fh.readline()
+      if reversed:
+        source, target = target, source  # reverse Q-A pair, for bi-direction model
       counter = 0
       while source and target and (not max_size or counter < max_size):
         counter += 1

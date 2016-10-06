@@ -20,13 +20,14 @@ from __future__ import division
 from __future__ import print_function
 
 import random
-
 import numpy as np
-from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
+from math import log
+from six.moves import xrange  # pylint: disable=redefined-builtin
+from tensorflow.python.ops import control_flow_ops
 from tensorflow.models.rnn.translate import data_utils
-
+from lib import seq2seq as tf_seq2seq
 
 class Seq2SeqModel(object):
   """Sequence-to-sequence model with attention and for multiple buckets.
@@ -55,8 +56,6 @@ class Seq2SeqModel(object):
                learning_rate_decay_factor,
                use_lstm=False,
                num_samples=512,
-               forward_only=False,
-               force_dec_input=False,
                scope_name='seq2seq',
                dtype=tf.float32):
     """Create the model.
@@ -79,7 +78,7 @@ class Seq2SeqModel(object):
       learning_rate_decay_factor: decay learning rate by this much when needed.
       use_lstm: if true, we use LSTM cells instead of GRU cells.
       num_samples: number of samples for sampled softmax.
-      forward_only: if set, we do not construct the backward pass in the model.
+      # forward_only: if set, we do not construct the backward pass in the model.
       dtype: the data type to use to store internal variables.
     """
     self.scope_name = scope_name
@@ -93,6 +92,7 @@ class Seq2SeqModel(object):
       self.learning_rate_decay_op = self.learning_rate.assign(
           self.learning_rate * learning_rate_decay_factor)
       self.global_step = tf.Variable(0, trainable=False)
+      self.dummy_dialogs = [] # [TODO] load dummy sentences 
 
       # If we use sampled softmax, we need an output projection.
       output_projection = None
@@ -127,7 +127,7 @@ class Seq2SeqModel(object):
 
       # The seq2seq function: we use embedding for the input and attention.
       def seq2seq_f(encoder_inputs, decoder_inputs, do_decode):
-        return tf.nn.seq2seq.embedding_attention_seq2seq(
+        return tf_seq2seq.embedding_attention_seq2seq(
             encoder_inputs, decoder_inputs, cell,
             num_encoder_symbols=source_vocab_size,
             num_decoder_symbols=target_vocab_size,
@@ -153,40 +153,49 @@ class Seq2SeqModel(object):
       targets = [self.decoder_inputs[i + 1]
                  for i in xrange(len(self.decoder_inputs) - 1)]
 
+      # for reinforcement learning
+      self.force_dec_input = tf.placeholder(tf.bool, name="force_dec_input")
+      self.en_output_proj = tf.placeholder(tf.bool, name="en_output_proj")
+      
       # Training outputs and losses.
-      if forward_only:
-        self.outputs, self.losses = tf.nn.seq2seq.model_with_buckets(
-            self.encoder_inputs, self.decoder_inputs, targets,
-            self.target_weights, buckets, 
-            lambda x, y: seq2seq_f(x, y, (not force_dec_input)),
-            softmax_loss_function=softmax_loss_function)
+      # if forward_only:  # testing or reinforcement training
+      self.outputs, self.losses, self.encoder_state = tf_seq2seq.model_with_buckets(
+          self.encoder_inputs, self.decoder_inputs, targets,
+          self.target_weights, buckets, 
+          lambda x, y: seq2seq_f(x, y, tf.select(self.force_dec_input, False, True)),
+          softmax_loss_function=softmax_loss_function
+        )
         # If we use output projection, we need to project outputs for decoding.
-        if output_projection is not None:
-          for b in xrange(len(buckets)):
-            self.outputs[b] = [
-                tf.matmul(output, output_projection[0]) + output_projection[1]
-                for output in self.outputs[b]
-            ]
-      else:
-        self.outputs, self.losses = tf.nn.seq2seq.model_with_buckets(
-            self.encoder_inputs, self.decoder_inputs, targets,
-            self.target_weights, buckets,
-            lambda x, y: seq2seq_f(x, y, False),
-            softmax_loss_function=softmax_loss_function)
+        # if output_projection is not None:
+      self.projected_outputs = {}
+      for b in xrange(len(buckets)):
+        self.outputs[b] = [
+            control_flow_ops.cond(
+              self.en_output_proj,
+              lambda: tf.matmul(output, output_projection[0]) + output_projection[1],
+              lambda: output
+            )
+            for output in self.outputs[b]
+        ]
+      # else: # normal training
+      #   self.outputs, self.losses, self.encoder_state = tf_seq2seq.model_with_buckets(
+      #       self.encoder_inputs, self.decoder_inputs, targets,
+      #       self.target_weights, buckets,
+      #       lambda x, y: seq2seq_f(x, y, False),
+      #       softmax_loss_function=softmax_loss_function)
 
       # Gradients and SGD update operation for training the model.
       params = tf.trainable_variables()
-      if not forward_only:
-        self.gradient_norms = []
-        self.updates = []
-        opt = tf.train.GradientDescentOptimizer(self.learning_rate)
-        for b in xrange(len(buckets)):
-          gradients = tf.gradients(self.losses[b], params)
-          clipped_gradients, norm = tf.clip_by_global_norm(gradients,
-                                                           max_gradient_norm)
-          self.gradient_norms.append(norm)
-          self.updates.append(opt.apply_gradients(
-              zip(clipped_gradients, params), global_step=self.global_step))
+      self.gradient_norms = []
+      self.updates = []
+      opt = tf.train.GradientDescentOptimizer(self.learning_rate)
+      for b in xrange(len(buckets)):
+        gradients = tf.gradients(self.losses[b], params)
+        clipped_gradients, norm = tf.clip_by_global_norm(gradients,
+                                                         max_gradient_norm)
+        self.gradient_norms.append(norm)
+        self.updates.append(opt.apply_gradients(
+            zip(clipped_gradients, params), global_step=self.global_step))
 
       # self.saver = tf.train.Saver(tf.all_variables())
       all_variables = [k for k in tf.all_variables() if k.name.startswith(self.scope_name)]
@@ -194,7 +203,7 @@ class Seq2SeqModel(object):
       
 
   def step(self, session, encoder_inputs, decoder_inputs, target_weights,
-           bucket_id, forward_only, debug=False):
+           bucket_id, training=False, force_dec_input=False):
 
     """Run a step of the model feeding the given inputs.
 
@@ -204,7 +213,8 @@ class Seq2SeqModel(object):
       decoder_inputs: list of numpy int vectors to feed as decoder inputs.
       target_weights: list of numpy float vectors to feed as target weights.
       bucket_id: which bucket of the model to use.
-      forward_only: whether to do the backward step or only forward.
+      # forward_only: whether to do the backward step or only forward.
+      training: True while training mode, do gradient decent.
 
     Returns:
       A triple consisting of gradient norm (or None if we did not do backward),
@@ -227,32 +237,134 @@ class Seq2SeqModel(object):
                        " %d != %d." % (len(target_weights), decoder_size))
 
     # Input feed: encoder inputs, decoder inputs, target_weights, as provided.
-    input_feed = {}
+    input_feed = {
+      self.force_dec_input.name:  force_dec_input,
+      self.en_output_proj:        (not training),
+    }
     for l in xrange(encoder_size):
       input_feed[self.encoder_inputs[l].name] = encoder_inputs[l]
     for l in xrange(decoder_size):
       input_feed[self.decoder_inputs[l].name] = decoder_inputs[l]
       input_feed[self.target_weights[l].name] = target_weights[l]
-
+    
     # Since our targets are decoder inputs shifted by one, we need one more.
     last_target = self.decoder_inputs[decoder_size].name
     input_feed[last_target] = np.zeros([self.batch_size], dtype=np.int32)
 
     # Output feed: depends on whether we do a backward step or not.
-    if not forward_only:
+    if training:  # normal training
       output_feed = [self.updates[bucket_id],  # Update Op that does SGD.
                      self.gradient_norms[bucket_id],  # Gradient norm.
                      self.losses[bucket_id]]  # Loss for this batch.
-    else:
-      output_feed = [self.losses[bucket_id]]  # Loss for this batch.
+    else:  # testing or reinforcement learning
+      output_feed = [self.encoder_state[bucket_id], self.losses[bucket_id]]  # Loss for this batch.
       for l in xrange(decoder_size):  # Output logits.
         output_feed.append(self.outputs[bucket_id][l])
 
     outputs = session.run(output_feed, input_feed)
-    if not forward_only:
+    if training:
       return outputs[1], outputs[2], None  # Gradient norm, loss, no outputs.
     else:
-      return None, outputs[0], outputs[1:]  # No gradient norm, loss, outputs.
+      return outputs[0], outputs[1], outputs[2:]  # encoder_state, loss, outputs.
+
+
+
+  def step_rf(self, args, session, encoder_inputs, decoder_inputs, target_weights,
+           bucket_id, rev_vocab=None, debug=True):
+    
+    # initial episodes
+    sent_max_length = args.buckets[-1][0]
+    _, input_txt = self.logits2tokens(encoder_inputs, rev_vocab, sent_max_length, reverse=True)
+    if debug: print("[INPUT]:", input_txt)
+    
+    episode, rewards, dialog, enc_states = 0, [0], [input_txt], [None]
+    while True:
+      # generate response
+      encoder_state, _, output_logits = self.step(session, encoder_inputs, decoder_inputs, target_weights,
+                          bucket_id, training=False, force_dec_input=False)
+      
+      # process response
+      resp_tokens, resp_txt = self.logits2tokens(output_logits, rev_vocab, sent_max_length)
+      if debug: print("[RESP]:", resp_txt)
+
+      # check if dialog ended
+      if (resp_txt in self.dummy_dialogs) or (len(resp_txt) < 3) or (resp_txt in dialog):
+        break
+      
+      # record meta-datas
+      dialog.append(resp_txt)
+      enc_states_vec = np.reshape(np.squeeze(encoder_state, axis=1), (-1))
+      enc_states.append(enc_states_vec)
+
+      # prepare for next dialogue
+      last_encoder_inputs = encoder_inputs
+      bucket_id = min([b for b in range(len(args.buckets)) if args.buckets[b][0] > len(resp_tokens)])
+      feed_data = {bucket_id: [(resp_tokens, [])]}
+      encoder_inputs, decoder_inputs, target_weights = self.get_batch(feed_data, bucket_id)
+      
+      # [Reward_1: Ease of answering]
+      r1 = [self.logProb(session, buckets, encoder_inputs, d) for d in self.dummy_dialogs]
+      r1 = -np.mean(r1) if r1 else 0
+      
+      # [Reward_2: Information Flow]
+      if episode < 2:
+        r2 = 0
+      else:
+        vec_a, vec_b = enc_states[episode-2], enc_states[episode]
+        r2 = sum(vec_a*vec_b) / sum(abs(vec_a)*abs(vec_b))
+        r2 = -log(r2)
+      
+      # [Reward_3: Semantic Coherence]
+      r3 = -self.Prob(session, buckets, encoder_inputs, last_encoder_inputs)
+
+      # [Episode total reward collection]
+      R = 0.25*r1 + 0.25*r2 + 0.5*r3
+      print("[Rewards]:", r1, r2, r3, R)
+      rewards.append(R)
+      episode += 1
+
+    # apply_gradient according to rewards
+    print("[Step] final:", episode, rewards, dialog)
+    return None, rewards, None
+
+
+
+  # log(P(b|a)), the conditional likelyhood
+  def logProb(self, session, buckets, tokens_a, tokens_b, weights):
+    def softmax(x):
+      return np.exp(x) / np.sum(np.exp(x), axis=0)
+
+    # prepare for next dialogue
+    bucket_id = min([b for b in range(len(buckets)) if buckets[b][0] > len(tokens_a)])
+    feed_data = {bucket_id: [(tokens_a, tokens_b)]}
+    encoder_inputs, decoder_inputs, target_weights = self.get_batch(feed_data, bucket_id)
+
+    # step
+    _, _, output_logits = self.step(session, encoder_inputs, decoder_inputs, target_weights,
+                        bucket_id, training=False, force_dec_input=True)
+    
+    # p = log(P(b|a)) / N
+    p = 1
+    for t, logit in zip(tokens_b, output_logits):
+      p *= softmax(logit[0])[t]
+    p = log(p) / len(tokens_b)
+    return p
+
+
+  def logits2tokens(self, logits, rev_vocab, sent_max_length=None, reverse=False):
+    if reverse:
+      tokens = [t[0] for t in reversed(logits)]
+    else:
+      tokens = [int(np.argmax(t, axis=1)) for t in logits]
+    if data_utils.EOS_ID in tokens:
+      eos = tokens.index(data_utils.EOS_ID)
+      tokens = tokens[:eos]
+    txt = [rev_vocab[t] for t in tokens]
+    if sent_max_length:
+      tokens, txt = tokens[:sent_max_length], txt[:sent_max_length]
+    return tokens, txt
+
+
 
   def get_batch(self, data, bucket_id):
     """Get a random batch of data from the specified bucket, prepare for step.

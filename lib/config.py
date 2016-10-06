@@ -13,14 +13,14 @@ def params_setup(cmdline=None):
   parser.add_argument('--learning_rate', type=float, default=0.5, help='Learning rate.')
   parser.add_argument('--learning_rate_decay_factor', type=float, default=0.99, help='Learning rate decays by this much.')
   parser.add_argument('--max_gradient_norm', type=float, default=5.0, help='Clip gradients to this norm.')
-  parser.add_argument('--batch_size', type=int, default=128, help='Batch size to use during training.')
+  parser.add_argument('--batch_size', type=int, default=64, help='Batch size to use during training.')
 
   parser.add_argument('--vocab_size', type=int, default=100000, help='Dialog vocabulary size.')
   parser.add_argument('--size', type=int, default=128, help='Size of each model layer.')
-  parser.add_argument('--num_layers', type=int, default=4, help='Number of layers in the model.')
+  parser.add_argument('--num_layers', type=int, default=2, help='Number of layers in the model.')
 
   parser.add_argument('--max_train_data_size', type=int, default=0, help='Limit on the size of training data (0: no limit)')
-  parser.add_argument('--steps_per_checkpoint', type=int, default=10000, help='How many training steps to do per checkpoint')
+  parser.add_argument('--steps_per_checkpoint', type=int, default=1000, help='How many training steps to do per checkpoint')
 
   # predicting params
   parser.add_argument('--beam_size', type=int, default=10, help='beam search size')
@@ -29,6 +29,10 @@ def params_setup(cmdline=None):
 
   # environment params
   parser.add_argument('--gpu_usage', type=float, default=0.5, help='tensorflow gpu memory fraction used')
+  parser.add_argument('--rev_model', type=int, default=0, help='reverse Q-A pair, for bi-direction model')
+  parser.add_argument('--reinforce_learn', type=int, default=0, help='Activate Reinforcement Learning.')
+  parser.add_argument('--en_tfboard', type=int, default=0, help='Enable writing out tensorboard meta data.')
+  
 
   if cmdline:
     args = parser.parse_args(cmdline)
@@ -36,6 +40,7 @@ def params_setup(cmdline=None):
     args = parser.parse_args()
   
   if not args.scope_name: args.scope_name = args.model_name
+  if args.rev_model: args.model_name += '_bidi' # bi-direction model
   
   # We use a number of buckets and pad to the closest one for efficiency.
   # See seq2seq_model.Seq2SeqModel for details of how they work.

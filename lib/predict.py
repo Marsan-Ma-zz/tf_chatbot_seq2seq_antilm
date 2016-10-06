@@ -19,7 +19,7 @@ def predict(args, debug=False):
     with tf.Session() as sess, open(results_path, 'w') as results_fh:
         # Create model and load parameters.
         args.batch_size = 1  # We decode one sentence at a time.
-        model = create_model(sess, args, forward_only=True, force_dec_input=True)
+        model = create_model(sess, args) #, forward_only=True) #, force_dec_input=True)
 
         # Load vocabularies.
         vocab_path = os.path.join(args.data_dir, "vocab%d.in" % args.vocab_size)

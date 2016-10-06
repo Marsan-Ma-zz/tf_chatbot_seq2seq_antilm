@@ -14,7 +14,7 @@ from lib import seq2seq_model
 
 import heapq
 
-def create_model(session, args, forward_only, force_dec_input=False):
+def create_model(session, args): #, forward_only):
   """Create translation model and initialize or load parameters in session."""
   model = seq2seq_model.Seq2SeqModel(
       source_vocab_size=args.vocab_size,
@@ -27,13 +27,12 @@ def create_model(session, args, forward_only, force_dec_input=False):
       learning_rate=args.learning_rate,
       learning_rate_decay_factor=args.learning_rate_decay_factor,
       use_lstm=False,
-      forward_only=forward_only,
-      force_dec_input=force_dec_input,
-      # scope_name=args.scope_name,
+      # forward_only=forward_only,
   )
 
   # for tensorboard
-  summary_writer = tf.train.SummaryWriter(args.tf_board_dir, session.graph)
+  if args.en_tfboard:
+    summary_writer = tf.train.SummaryWriter(args.tf_board_dir, session.graph)
 
   ckpt = tf.train.get_checkpoint_state(args.model_dir)
   if ckpt and gfile.Exists(ckpt.model_checkpoint_path):
@@ -74,7 +73,7 @@ def cal_bleu(cands, ref, stopwords=['的', '嗎']):
 
 def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, debug=False, return_raw=False):
     def model_step(enc_inp, dec_inp, dptr, target_weights, bucket_id):
-      _, _, logits = model.step(sess, enc_inp, dec_inp, target_weights, bucket_id, forward_only=True, debug=debug)
+      _, _, logits = model.step(sess, enc_inp, dec_inp, target_weights, bucket_id, forward_only=True, force_dec_input=True, debug=debug)
       prob = softmax(logits[dptr][0])
       # print("model_step @ %s" % (datetime.now()))
       return prob
