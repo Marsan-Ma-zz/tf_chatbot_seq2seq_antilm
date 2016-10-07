@@ -14,7 +14,7 @@ from lib import seq2seq_model
 
 import heapq
 
-def create_model(session, args): #, forward_only):
+def create_model(session, args):
   """Create translation model and initialize or load parameters in session."""
   model = seq2seq_model.Seq2SeqModel(
       source_vocab_size=args.vocab_size,
@@ -27,7 +27,6 @@ def create_model(session, args): #, forward_only):
       learning_rate=args.learning_rate,
       learning_rate_decay_factor=args.learning_rate_decay_factor,
       use_lstm=False,
-      # forward_only=forward_only,
   )
 
   # for tensorboard
@@ -73,10 +72,18 @@ def cal_bleu(cands, ref, stopwords=['的', '嗎']):
 
 def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, debug=False, return_raw=False):
     def model_step(enc_inp, dec_inp, dptr, target_weights, bucket_id):
-      _, _, logits = model.step(sess, enc_inp, dec_inp, target_weights, bucket_id, forward_only=True, force_dec_input=True, debug=debug)
+      _, _, logits = model.step(sess, enc_inp, dec_inp, target_weights, bucket_id, force_dec_input=True)
       prob = softmax(logits[dptr][0])
       # print("model_step @ %s" % (datetime.now()))
       return prob
+
+    def greedy_dec(output_logits, rev_vocab):
+      selected_token_ids = [int(np.argmax(logit, axis=1)) for logit in output_logits]
+      if data_utils.EOS_ID in selected_token_ids:
+        eos = selected_token_ids.index(data_utils.EOS_ID)
+        selected_token_ids = selected_token_ids[:eos]
+      output_sentence = ' '.join([rev_vocab[t] for t in selected_token_ids])
+      return output_sentence
 
     input_token_ids = data_utils.sentence_to_token_ids(input_sentence, vocab)
 
@@ -88,6 +95,11 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
     # Get a 1-element batch to feed the sentence to the model.
     encoder_inputs, decoder_inputs, target_weights = model.get_batch(feed_data, bucket_id)
     if debug: print("\n[get_batch]\n", encoder_inputs, decoder_inputs, target_weights)
+
+    ### Original greedy decoding
+    if args.beam_size == 1:
+      _, _, output_logits = model.step(sess, encoder_inputs, decoder_inputs, target_weights, bucket_id)
+      return greedy_dec(output_logits, rev_vocab)
 
     # Get output logits for the sentence.
     beams, new_beams, results = [(1, {'eos': 0, 'dec_inp': decoder_inputs, 'prob': 1, 'prob_ts': 1, 'prob_t': 1})], [], [] # initialize beams as (log_prob, empty_string, eos)
@@ -124,27 +136,21 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
         # for debug use
         if return_raw: return all_prob, all_prob_ts, all_prob_t
         
-        # greddy search
-        if args.beam_size == 1:
-          pass # [TODO]
         # beam search  
-        else:
-          for c in np.argsort(all_prob)[::-1][:args.beam_size]:
-            new_cand = {
-              'eos'     : (c == data_utils.EOS_ID),
-              'dec_inp' : [(np.array([c]) if i == (dptr+1) else k) for i, k in enumerate(cand['dec_inp'])],
-              'prob_ts' : cand['prob_ts'] * all_prob_ts[c],
-              'prob_t'  : cand['prob_t'] * all_prob_t[c],
-              'prob'    : cand['prob'] * all_prob[c],
-            }
-            new_cand = (new_cand['prob'], new_cand) # for heapq can only sort according to list[0]
-            
-            if (len(new_beams) < args.beam_size):
-              heapq.heappush(new_beams, new_cand)
-              # print("new_beam push", new_cand)
-            elif (new_cand[0] > new_beams[0][0]):
-              heapq.heapreplace(new_beams, new_cand)
-              # print("new_beam replace", new_cand)
+        for c in np.argsort(all_prob)[::-1][:args.beam_size]:
+          new_cand = {
+            'eos'     : (c == data_utils.EOS_ID),
+            'dec_inp' : [(np.array([c]) if i == (dptr+1) else k) for i, k in enumerate(cand['dec_inp'])],
+            'prob_ts' : cand['prob_ts'] * all_prob_ts[c],
+            'prob_t'  : cand['prob_t'] * all_prob_t[c],
+            'prob'    : cand['prob'] * all_prob[c],
+          }
+          new_cand = (new_cand['prob'], new_cand) # for heapq can only sort according to list[0]
+          
+          if (len(new_beams) < args.beam_size):
+            heapq.heappush(new_beams, new_cand)
+          elif (new_cand[0] > new_beams[0][0]):
+            heapq.heapreplace(new_beams, new_cand)
     
     results += new_beams  # flush last cands
 
@@ -154,34 +160,3 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
       cand['dec_inp'] = " ".join([dict_lookup(rev_vocab, w) for w in cand['dec_inp']])
       res_cands.append(cand)
     return res_cands
-
-
-
-# def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess):
-#     input_token_ids = data_utils.sentence_to_token_ids(input_sentence, vocab)
-
-#     # Which bucket does it belong to?
-#     bucket_id = min([b for b in range(len(args.buckets)) if args.buckets[b][0] > len(input_token_ids)])
-#     outputs = []
-
-#     feed_data = {bucket_id: [(input_token_ids, outputs)]}
-#     # Get a 1-element batch to feed the sentence to the model.
-#     encoder_inputs, decoder_inputs, target_weights = model.get_batch(feed_data, bucket_id)
-
-#     # Get output logits for the sentence.
-#     _, _, output_logits = model.step(sess, encoder_inputs, decoder_inputs, target_weights, bucket_id, forward_only=True)
-
-#     outputs = []
-#     # This is a greedy decoder - outputs are just argmaxes of output_logits.
-#     for logit in output_logits:
-#         selected_token_id = int(np.argmax(logit, axis=1))
-
-#         if selected_token_id == data_utils.EOS_ID:
-#             break
-#         else:
-#             outputs.append(selected_token_id)
-
-#     # Forming output sentence on natural language
-#     output_sentence = ' '.join([rev_vocab[output] for output in outputs])
-
-#     return output_sentence

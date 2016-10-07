@@ -10,7 +10,7 @@ from lib.seq2seq_model_utils import create_model, get_predicted_sentence
 def chat(args):
   with tf.Session() as sess:
     # Create model and load parameters.
-    model = create_model(sess, args, forward_only=True)
+    model = create_model(sess, args)
     model.batch_size = 1  # We decode one sentence at a time.
 
     # Load vocabularies.
@@ -23,7 +23,7 @@ def chat(args):
     sentence = sys.stdin.readline()
 
     while sentence:
-        predicted_sentence = get_predicted_sentence(sentence, vocab, rev_vocab, model, sess)
+        predicted_sentence = get_predicted_sentence(args, sentence, vocab, rev_vocab, model, sess)
         print(predicted_sentence)
         print("> ")
         sys.stdout.flush()

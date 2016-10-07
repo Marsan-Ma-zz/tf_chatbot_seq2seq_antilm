@@ -156,8 +156,9 @@ class Seq2SeqModel(object):
       # for reinforcement learning
       self.force_dec_input = tf.placeholder(tf.bool, name="force_dec_input")
       self.en_output_proj = tf.placeholder(tf.bool, name="en_output_proj")
-
+      
       # Training outputs and losses.
+      # if forward_only:  # testing or reinforcement training
       self.outputs, self.losses, self.encoder_state = tf_seq2seq.model_with_buckets(
           self.encoder_inputs, self.decoder_inputs, targets,
           self.target_weights, buckets, 
@@ -166,6 +167,7 @@ class Seq2SeqModel(object):
         )
         # If we use output projection, we need to project outputs for decoding.
         # if output_projection is not None:
+      self.projected_outputs = {}
       for b in xrange(len(buckets)):
         self.outputs[b] = [
             control_flow_ops.cond(
@@ -175,17 +177,14 @@ class Seq2SeqModel(object):
             )
             for output in self.outputs[b]
         ]
-        
-      # external loss overwrite while reinforcement learning
-      self.en_ext_losses = tf.placeholder(tf.bool, name="en_output_proj")
-      self.ext_losses = [tf.placeholder(tf.float32, name="ext_losses_%i" % i) for i in range(len(buckets))]
-      # print("[debug]", np.shape(self.losses), np.shape(self.ext_losses), buckets)
-      self.losses = control_flow_ops.cond(
-          self.en_ext_losses,
-          lambda: self.ext_losses,
-          lambda: self.losses,
-      )
+      # else: # normal training
+      #   self.outputs, self.losses, self.encoder_state = tf_seq2seq.model_with_buckets(
+      #       self.encoder_inputs, self.decoder_inputs, targets,
+      #       self.target_weights, buckets,
+      #       lambda x, y: seq2seq_f(x, y, False),
+      #       softmax_loss_function=softmax_loss_function)
 
+      # Gradients and SGD update operation for training the model.
       params = tf.trainable_variables()
       self.gradient_norms = []
       self.updates = []
@@ -201,32 +200,10 @@ class Seq2SeqModel(object):
       # self.saver = tf.train.Saver(tf.all_variables())
       all_variables = [k for k in tf.all_variables() if k.name.startswith(self.scope_name)]
       self.saver = tf.train.Saver(all_variables)
-
-      # # Gradients and SGD update operation for training the model.
-      # params = tf.trainable_variables()
-      # self.gradients = [tf.gradients(self.losses[b], params) for b in xrange(len(buckets))]
-
-      # # use ext_losses thus losses could be assigned by external logic, like reinforcement learning
-      # self.ext_losses = tf.placeholder(tf.float32, [len(buckets)], name="ext_losses")
-      # self.ext_gradients = [tf.gradients(self.ext_losses[b], params) for b in xrange(len(buckets))]
-      # # self.gradient_norms = []
-      # self.updates = []
-      # # opt = tf.train.GradientDescentOptimizer(self.learning_rate)
-      # opt = tf.train.AdamOptimizer(learning_rate=learning_rate)
-      # for b in xrange(len(buckets)):
-      #   clipped_gradients, norm = tf.clip_by_global_norm(self.ext_gradients[b],
-      #                                                    max_gradient_norm)
-      #   # self.gradient_norms.append(norm)
-      #   self.updates.append(opt.apply_gradients(
-      #       zip(clipped_gradients, params), global_step=self.global_step))
-
-      # # self.saver = tf.train.Saver(tf.all_variables())
-      # all_variables = [k for k in tf.all_variables() if k.name.startswith(self.scope_name)]
-      # self.saver = tf.train.Saver(all_variables)
       
 
   def step(self, session, encoder_inputs, decoder_inputs, target_weights,
-           bucket_id, training=False, force_dec_input=False, ext_losses=None):
+           bucket_id, training=False, force_dec_input=False):
 
     """Run a step of the model feeding the given inputs.
 
@@ -263,10 +240,7 @@ class Seq2SeqModel(object):
     input_feed = {
       self.force_dec_input.name:  force_dec_input,
       self.en_output_proj:        (not training),
-      self.en_ext_losses:         False, #(ext_losses != None),
     }
-    for b in xrange(len(self.buckets)):
-      input_feed[self.ext_losses[b]] = 0.0
     for l in xrange(encoder_size):
       input_feed[self.encoder_inputs[l].name] = encoder_inputs[l]
     for l in xrange(decoder_size):
@@ -292,22 +266,6 @@ class Seq2SeqModel(object):
       return outputs[1], outputs[2], None  # Gradient norm, loss, no outputs.
     else:
       return outputs[0], outputs[1], outputs[2:]  # encoder_state, loss, outputs.
-
-    # if training:  # normal training
-    #   output_feed = [self.gradients[bucket_id],  # Gradient norm.
-    #                 self.losses[bucket_id]]  # Loss for this batch.
-    #   gradients, losses = session.run(output_feed, input_feed)
-    #   # update gradient
-    #   input_feed  = {self.ext_losses[bucket_id]: losses}
-    #   output_feed = [self.updates[bucket_id]]  # Update Op that does SGD.
-    #   outputs = session.run(output_feed, input_feed)
-    #   return gradients, loss, None  # Gradient norm, loss, no outputs.
-    # else:         # testing or reinforcement learning
-    #   output_feed = [self.encoder_state[bucket_id], self.losses[bucket_id]]  # Loss for this batch.
-    #   for l in xrange(decoder_size):  # Output logits.
-    #     output_feed.append(self.outputs[bucket_id][l])
-    #   outputs = session.run(output_feed, input_feed)
-    #   return outputs[0], outputs[1], outputs[2:]  # encoder_state, loss, outputs.
 
 
 
@@ -357,7 +315,7 @@ class Seq2SeqModel(object):
         r2 = -log(r2)
       
       # [Reward_3: Semantic Coherence]
-      r3 = -self.logProb(session, buckets, encoder_inputs, last_encoder_inputs)
+      r3 = -self.Prob(session, buckets, encoder_inputs, last_encoder_inputs)
 
       # [Episode total reward collection]
       R = 0.25*r1 + 0.25*r2 + 0.5*r3
@@ -365,13 +323,6 @@ class Seq2SeqModel(object):
       rewards.append(R)
       episode += 1
 
-    # gradient decent according to batch rewards
-    input_feed  = {
-      self.en_ext_losses: True,
-      self.ext_losses[bucket_id]: rewards,
-    }
-    output_feed = [self.updates[bucket_id]]  # Update Op that does SGD.
-    outputs = session.run(output_feed, input_feed)
     # apply_gradient according to rewards
     print("[Step] final:", episode, rewards, dialog)
     return None, rewards, None
