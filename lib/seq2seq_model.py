@@ -177,56 +177,27 @@ class Seq2SeqModel(object):
         ]
         
       # external loss overwrite while reinforcement learning
-      self.en_ext_losses = tf.placeholder(tf.bool, name="en_output_proj")
-      self.ext_losses = [tf.placeholder(tf.float32, name="ext_losses_%i" % i) for i in range(len(buckets))]
-      # print("[debug]", np.shape(self.losses), np.shape(self.ext_losses), buckets)
-      self.losses = control_flow_ops.cond(
-          self.en_ext_losses,
-          lambda: self.ext_losses,
-          lambda: self.losses,
-      )
-
-      params = tf.trainable_variables()
+      self.tvars = tf.trainable_variables()
       self.gradient_norms = []
       self.updates = []
+      self.advantage = [tf.placeholder(tf.float32, name="advantage_%i" % i) for i in range(len(buckets))]
       opt = tf.train.GradientDescentOptimizer(self.learning_rate)
       for b in xrange(len(buckets)):
-        gradients = tf.gradients(self.losses[b], params)
+        adjusted_losses = tf.sub(self.losses[b], self.advantage[b])
+        gradients = tf.gradients(adjusted_losses, self.tvars)
         clipped_gradients, norm = tf.clip_by_global_norm(gradients,
                                                          max_gradient_norm)
         self.gradient_norms.append(norm)
         self.updates.append(opt.apply_gradients(
-            zip(clipped_gradients, params), global_step=self.global_step))
+            zip(clipped_gradients, self.tvars), global_step=self.global_step))
 
       # self.saver = tf.train.Saver(tf.all_variables())
       all_variables = [k for k in tf.all_variables() if k.name.startswith(self.scope_name)]
       self.saver = tf.train.Saver(all_variables)
 
-      # # Gradients and SGD update operation for training the model.
-      # params = tf.trainable_variables()
-      # self.gradients = [tf.gradients(self.losses[b], params) for b in xrange(len(buckets))]
-
-      # # use ext_losses thus losses could be assigned by external logic, like reinforcement learning
-      # self.ext_losses = tf.placeholder(tf.float32, [len(buckets)], name="ext_losses")
-      # self.ext_gradients = [tf.gradients(self.ext_losses[b], params) for b in xrange(len(buckets))]
-      # # self.gradient_norms = []
-      # self.updates = []
-      # # opt = tf.train.GradientDescentOptimizer(self.learning_rate)
-      # opt = tf.train.AdamOptimizer(learning_rate=learning_rate)
-      # for b in xrange(len(buckets)):
-      #   clipped_gradients, norm = tf.clip_by_global_norm(self.ext_gradients[b],
-      #                                                    max_gradient_norm)
-      #   # self.gradient_norms.append(norm)
-      #   self.updates.append(opt.apply_gradients(
-      #       zip(clipped_gradients, params), global_step=self.global_step))
-
-      # # self.saver = tf.train.Saver(tf.all_variables())
-      # all_variables = [k for k in tf.all_variables() if k.name.startswith(self.scope_name)]
-      # self.saver = tf.train.Saver(all_variables)
-      
 
   def step(self, session, encoder_inputs, decoder_inputs, target_weights,
-           bucket_id, training=False, force_dec_input=False, ext_losses=None):
+           bucket_id, training=False, force_dec_input=False, advantage=None):
 
     """Run a step of the model feeding the given inputs.
 
@@ -263,10 +234,9 @@ class Seq2SeqModel(object):
     input_feed = {
       self.force_dec_input.name:  force_dec_input,
       self.en_output_proj:        (not training),
-      self.en_ext_losses:         False, #(ext_losses != None),
     }
-    for b in xrange(len(self.buckets)):
-      input_feed[self.ext_losses[b]] = 0.0
+    for l in xrange(len(self.buckets)):
+      input_feed[self.advantage[l].name] = advantage[l] if advantage else 0
     for l in xrange(encoder_size):
       input_feed[self.encoder_inputs[l].name] = encoder_inputs[l]
     for l in xrange(decoder_size):
@@ -293,93 +263,79 @@ class Seq2SeqModel(object):
     else:
       return outputs[0], outputs[1], outputs[2:]  # encoder_state, loss, outputs.
 
-    # if training:  # normal training
-    #   output_feed = [self.gradients[bucket_id],  # Gradient norm.
-    #                 self.losses[bucket_id]]  # Loss for this batch.
-    #   gradients, losses = session.run(output_feed, input_feed)
-    #   # update gradient
-    #   input_feed  = {self.ext_losses[bucket_id]: losses}
-    #   output_feed = [self.updates[bucket_id]]  # Update Op that does SGD.
-    #   outputs = session.run(output_feed, input_feed)
-    #   return gradients, loss, None  # Gradient norm, loss, no outputs.
-    # else:         # testing or reinforcement learning
-    #   output_feed = [self.encoder_state[bucket_id], self.losses[bucket_id]]  # Loss for this batch.
-    #   for l in xrange(decoder_size):  # Output logits.
-    #     output_feed.append(self.outputs[bucket_id][l])
-    #   outputs = session.run(output_feed, input_feed)
-    #   return outputs[0], outputs[1], outputs[2:]  # encoder_state, loss, outputs.
-
 
 
   def step_rf(self, args, session, encoder_inputs, decoder_inputs, target_weights,
            bucket_id, rev_vocab=None, debug=True):
     
-    # initial episodes
+    # initialize 
+    init_inputs = [encoder_inputs, decoder_inputs, target_weights, bucket_id]
     sent_max_length = args.buckets[-1][0]
-    _, input_txt = self.logits2tokens(encoder_inputs, rev_vocab, sent_max_length, reverse=True)
-    if debug: print("[INPUT]:", input_txt)
+    resp_tokens, resp_txt = self.logits2tokens(encoder_inputs, rev_vocab, sent_max_length, reverse=True)
+    if debug: print("[INPUT]:", resp_txt)
     
-    episode, rewards, dialog, enc_states = 0, [0], [input_txt], [None]
+    # Initialize
+    ep_rewards, ep_step_loss, enc_states = [], [], []
+    ep_encoder_inputs, ep_target_weights, ep_bucket_id = [], [], []
+
+    # [Episode] per episode = n steps, until break
     while True:
-      # generate response
-      encoder_state, _, output_logits = self.step(session, encoder_inputs, decoder_inputs, target_weights,
+      #----[Step]----------------------------------------
+      encoder_state, step_loss, output_logits = self.step(session, encoder_inputs, decoder_inputs, target_weights,
                           bucket_id, training=False, force_dec_input=False)
+      
+      # memorize inputs for reproducing curriculum with adjusted losses
+      ep_encoder_inputs.append(encoder_inputs)
+      ep_target_weights.append(target_weights)
+      ep_bucket_id.append(bucket_id)
+      ep_step_loss.append(step_loss)
+      enc_states_vec = np.reshape(np.squeeze(encoder_state, axis=1), (-1))
+      enc_states.append(enc_states_vec)
       
       # process response
       resp_tokens, resp_txt = self.logits2tokens(output_logits, rev_vocab, sent_max_length)
-      if debug: print("[RESP]:", resp_txt)
-
-      # check if dialog ended
-      if (resp_txt in self.dummy_dialogs) or (len(resp_txt) < 3) or (resp_txt in dialog):
-        break
-      
-      # record meta-datas
-      dialog.append(resp_txt)
-      enc_states_vec = np.reshape(np.squeeze(encoder_state, axis=1), (-1))
-      enc_states.append(enc_states_vec)
+      if debug: print("[RESP]: (%.4f) %s" % (step_loss, resp_txt))
 
       # prepare for next dialogue
-      last_encoder_inputs = encoder_inputs
       bucket_id = min([b for b in range(len(args.buckets)) if args.buckets[b][0] > len(resp_tokens)])
       feed_data = {bucket_id: [(resp_tokens, [])]}
       encoder_inputs, decoder_inputs, target_weights = self.get_batch(feed_data, bucket_id)
       
-      # [Reward_1: Ease of answering]
-      r1 = [self.logProb(session, buckets, encoder_inputs, d) for d in self.dummy_dialogs]
+      #----[Reward]----------------------------------------
+      # r1: Ease of answering
+      r1 = [self.logProb(session, args.buckets, resp_tokens, d) for d in self.dummy_dialogs]
       r1 = -np.mean(r1) if r1 else 0
       
-      # [Reward_2: Information Flow]
-      if episode < 2:
+      # r2: Information Flow
+      if len(enc_states) < 2:
         r2 = 0
       else:
-        vec_a, vec_b = enc_states[episode-2], enc_states[episode]
+        vec_a, vec_b = enc_states[-2], enc_states[-1]
         r2 = sum(vec_a*vec_b) / sum(abs(vec_a)*abs(vec_b))
         r2 = -log(r2)
       
-      # [Reward_3: Semantic Coherence]
-      r3 = -self.logProb(session, buckets, encoder_inputs, last_encoder_inputs)
+      # r3: Semantic Coherence
+      r3 = -self.logProb(session, args.buckets, resp_tokens, ep_encoder_inputs[-1])
 
-      # [Episode total reward collection]
+      # Episode total reward
       R = 0.25*r1 + 0.25*r2 + 0.5*r3
-      print("[Rewards]:", r1, r2, r3, R)
       rewards.append(R)
-      episode += 1
-
+      #----------------------------------------------------
+      if (resp_txt in self.dummy_dialogs) or (len(resp_tokens) <= 3) or (encoder_inputs in ep_encoder_inputs): 
+        break # check if dialog ended
+      
     # gradient decent according to batch rewards
-    input_feed  = {
-      self.en_ext_losses: True,
-      self.ext_losses[bucket_id]: rewards,
-    }
-    output_feed = [self.updates[bucket_id]]  # Update Op that does SGD.
-    outputs = session.run(output_feed, input_feed)
-    # apply_gradient according to rewards
-    print("[Step] final:", episode, rewards, dialog)
-    return None, rewards, None
+    rto = (max(ep_step_loss) - min(ep_step_loss)) / (max(ep_rewards) - min(ep_rewards))
+    advantage = [mp.mean(ep_rewards)*rto] * len(args.buckets)
+    _, step_loss, _ = self.step(session, init_inputs[0], init_inputs[1], init_inputs[2], init_inputs[3],
+              training=True, force_dec_input=False, advantage=advantage)
+    
+    return None, step_loss, None
 
 
 
   # log(P(b|a)), the conditional likelyhood
-  def logProb(self, session, buckets, tokens_a, tokens_b, weights):
+  def logProb(self, session, buckets, tokens_a, tokens_b):
     def softmax(x):
       return np.exp(x) / np.sum(np.exp(x), axis=0)
 
@@ -413,6 +369,15 @@ class Seq2SeqModel(object):
       tokens, txt = tokens[:sent_max_length], txt[:sent_max_length]
     return tokens, txt
 
+
+  def discount_rewards(self, r, gamma=0.99):
+    """ take 1D float array of rewards and compute discounted reward """
+    discounted_r = np.zeros_like(r)
+    running_add = 0
+    for t in reversed(xrange(0, r.size)):
+        running_add = running_add * gamma + r[t]
+        discounted_r[t] = running_add
+    return discounted_r
 
 
   def get_batch(self, data, bucket_id):

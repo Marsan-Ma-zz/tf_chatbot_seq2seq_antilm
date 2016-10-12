@@ -17,7 +17,7 @@ def params_setup(cmdline=None):
 
   parser.add_argument('--vocab_size', type=int, default=100000, help='Dialog vocabulary size.')
   parser.add_argument('--size', type=int, default=128, help='Size of each model layer.')
-  parser.add_argument('--num_layers', type=int, default=2, help='Number of layers in the model.')
+  parser.add_argument('--num_layers', type=int, default=4, help='Number of layers in the model.')
 
   parser.add_argument('--max_train_data_size', type=int, default=0, help='Limit on the size of training data (0: no limit)')
   parser.add_argument('--steps_per_checkpoint', type=int, default=1000, help='How many training steps to do per checkpoint')
@@ -30,8 +30,8 @@ def params_setup(cmdline=None):
   # environment params
   parser.add_argument('--gpu_usage', type=float, default=0.5, help='tensorflow gpu memory fraction used')
   parser.add_argument('--rev_model', type=int, default=0, help='reverse Q-A pair, for bi-direction model')
-  parser.add_argument('--reinforce_learn', type=int, default=0, help='Activate Reinforcement Learning.')
-  parser.add_argument('--en_tfboard', type=int, default=0, help='Enable writing out tensorboard meta data.')
+  parser.add_argument('--reinforce_learn', type=int, default=0, help='1 to enable reinforcement learning mode')
+  parser.add_argument('--en_tfboard', type=int, default=0, help='Enable writing out tensorboard meta data')
   
 
   if cmdline:
