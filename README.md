@@ -21,6 +21,12 @@ This is a [seq2seq model][a1] modified from [tensorflow example][a2].
 [a6]: https://arxiv.org/abs/1510.03055
 [a7]: https://arxiv.org/abs/1606.01541
 [a8]: http://flask.pocoo.org/
+[a9]: https://github.com/Marsan-Ma/tf_chatbot_seq2seq_antilm/blob/master/README2.md
+
+
+## In Layman's terms
+
+I explained some detail about the features and some implementation tricks [here][a9].
 
 
 ## Just tell me how it works
