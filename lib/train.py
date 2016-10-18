@@ -83,7 +83,7 @@ def train(args):
                                          target_weights, bucket_id, rev_vocab=rev_vocab)
           else:
             _, step_loss, _ = model.step(sess, encoder_inputs, decoder_inputs,
-                                         target_weights, bucket_id, training=True)
+                                         target_weights, bucket_id, training=True, force_dec_input=True)
 
           step_time += (time.time() - start_time) / args.steps_per_checkpoint
           loss += step_loss / args.steps_per_checkpoint

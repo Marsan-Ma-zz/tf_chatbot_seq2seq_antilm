@@ -13,7 +13,7 @@ def params_setup(cmdline=None):
   parser.add_argument('--learning_rate', type=float, default=0.5, help='Learning rate.')
   parser.add_argument('--learning_rate_decay_factor', type=float, default=0.99, help='Learning rate decays by this much.')
   parser.add_argument('--max_gradient_norm', type=float, default=5.0, help='Clip gradients to this norm.')
-  parser.add_argument('--batch_size', type=int, default=64, help='Batch size to use during training.')
+  parser.add_argument('--batch_size', type=int, default=128, help='Batch size to use during training.')
 
   parser.add_argument('--vocab_size', type=int, default=100000, help='Dialog vocabulary size.')
   parser.add_argument('--size', type=int, default=128, help='Size of each model layer.')
