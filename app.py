@@ -30,7 +30,7 @@ class ChatBot(object):
         
         # Create model and load parameters.
         self.args.batch_size = 1  # We decode one sentence at a time.
-        self.model = create_model(self.sess, self.args, forward_only=True, force_dec_input=True)
+        self.model = create_model(self.sess, self.args)
 
         # Load vocabularies.
         self.vocab_path = os.path.join(self.args.data_dir, "vocab%d.in" % self.args.vocab_size)
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     else:
         # initialize model
         args = params_setup()
-        chatbot = ChatBot(args, debug=False)
+        chatbot = ChatBot(args, debug=True)
         # start server
         context = ('ssl/server.crt', 'ssl/server.key')
         app.run(host='0.0.0.0', port=443, debug=False, ssl_context=context)

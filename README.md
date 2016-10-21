@@ -54,11 +54,19 @@ after you trained your model until perplexity under 50 or so, you could do:
 
     python3 main.py --mode test --model_name <MODEL_NAME>
 
-#### Start your Facebook Messenger backend server
+## Start your Facebook Messenger backend server
 
     python3 app.py --model_name <MODEL_NAME>
 
 You may see this [minimum fb_messenger example][b2] for more details like setting up SSL, webhook, and work-arounds for known bug.
+
+Here's an interesting comparison: The left conversation enabled beam search with beam = 10, the response is barely better than always "i don't know". The right conversation enabled anti-language model, which supposed to suppress generic response, thus the response is more interesting.
+
+![messenger.png][h1]
+
+[h1]: https://raw.githubusercontent.com/Marsan-Ma/tf_chatbot_seq2seq_antilm/master/doc/messenger.png
+
+
 
 
 ## Deep reinforcement learning
