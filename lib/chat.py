@@ -10,8 +10,8 @@ from lib.seq2seq_model_utils import create_model, get_predicted_sentence
 def chat(args):
   with tf.Session() as sess:
     # Create model and load parameters.
+    args.batch_size = 1  # We decode one sentence at a time.
     model = create_model(sess, args)
-    model.batch_size = 1  # We decode one sentence at a time.
 
     # Load vocabularies.
     vocab_path = os.path.join(args.data_dir, "vocab%d.in" % args.vocab_size)

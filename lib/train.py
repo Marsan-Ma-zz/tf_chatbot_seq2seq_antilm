@@ -44,7 +44,7 @@ def train(args):
         model = seq2seq_model_utils.create_model(sess, args)
 
         # Read data into buckets and compute their sizes.
-        print ("Reading development and training data (limit: %d)." % args.max_train_data_size)
+        print("Reading development and training data (limit: %d)." % args.max_train_data_size)
         dev_set = data_utils.read_data(dev_data, args.buckets, reversed=args.rev_model)
         train_set = data_utils.read_data(train_data, args.buckets, args.max_train_data_size, reversed=args.rev_model)
         train_bucket_sizes = [len(train_set[b]) for b in xrange(len(args.buckets))]

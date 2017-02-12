@@ -142,7 +142,7 @@ if __name__ == '__main__':
     else:
         # initialize model
         args = params_setup()
-        chatbot = ChatBot(args, debug=True)
+        chatbot = ChatBot(args, debug=False)
         # start server
         context = ('ssl/server.crt', 'ssl/server.key')
         app.run(host='0.0.0.0', port=443, debug=False, ssl_context=context)

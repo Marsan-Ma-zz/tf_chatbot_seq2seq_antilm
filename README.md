@@ -54,13 +54,18 @@ after you trained your model until perplexity under 50 or so, you could do:
 
     python3 main.py --mode test --model_name <MODEL_NAME>
 
+
+**[Note!!!] if you put any parameter overwrite in this main.py commmand, be sure to apply both to train and test, or just modify in lib/config.py for failsafe.**
+
+
+
 ## Start your Facebook Messenger backend server
 
     python3 app.py --model_name <MODEL_NAME>
 
 You may see this [minimum fb_messenger example][b2] for more details like setting up SSL, webhook, and work-arounds for known bug.
 
-Here's an interesting comparison: The left conversation enabled beam search with beam = 10, the response is barely better than always "i don't know". The right conversation enabled anti-language model, which supposed to suppress generic response, thus the response is more interesting.
+Here's an interesting comparison: The left conversation enabled beam search with beam = 10, the response is barely better than always "i don't know". The right conversation also used beam search and additionally, enabled anti-language model. This supposed to suppress generic response, and the response do seems better.
 
 ![messenger.png][h1]
 
