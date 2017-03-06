@@ -28,7 +28,7 @@ def params_setup(cmdline=None):
   parser.add_argument('--n_bonus', type=int, default=0, help='bonus with sentence length')
 
   # environment params
-  parser.add_argument('--gpu_usage', type=float, default=0.5, help='tensorflow gpu memory fraction used')
+  parser.add_argument('--gpu_usage', type=float, default=1.0, help='tensorflow gpu memory fraction used')
   parser.add_argument('--rev_model', type=int, default=0, help='reverse Q-A pair, for bi-direction model')
   parser.add_argument('--reinforce_learn', type=int, default=0, help='1 to enable reinforcement learning mode')
   parser.add_argument('--en_tfboard', type=int, default=0, help='Enable writing out tensorboard meta data')

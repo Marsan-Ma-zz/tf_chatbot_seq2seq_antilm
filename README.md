@@ -2,6 +2,9 @@
 ### (with seq2seq + attention + dict-compress + beam search + anti-LM + deep reinforcement learning + facebook messenger server)
 
 
+> Update-2017-03-06: This work now upgrade to tensorflow v1.0.0 support. No backward support since too much have changed in tensorflow.
+
+
 ## Briefing
 This is a [seq2seq model][a1] modified from [tensorflow example][a2].
 
