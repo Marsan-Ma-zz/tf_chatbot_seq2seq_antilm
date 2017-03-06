@@ -24,7 +24,14 @@ def chat(args):
 
     while sentence:
         predicted_sentence = get_predicted_sentence(args, sentence, vocab, rev_vocab, model, sess)
-        print(predicted_sentence)
+        # print(predicted_sentence)
+        if isinstance(predicted_sentence, list):
+            for sent in predicted_sentence:
+                print("  (%s) -> %s" % (sent['prob'], sent['dec_inp']))
+        else:
+            print(sentence, ' -> ', predicted_sentence)
+            
         print("> ")
         sys.stdout.flush()
         sentence = sys.stdin.readline()
+

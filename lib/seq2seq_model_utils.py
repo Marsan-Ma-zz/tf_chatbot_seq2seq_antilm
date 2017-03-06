@@ -44,10 +44,11 @@ def create_model(session, args):
 
 
 def dict_lookup(rev_vocab, out):
-    if (out < len(rev_vocab)):
-      return rev_vocab[out]  
-    else: 
-      return data_utils._UNK
+    word = rev_vocab[out] if (out < len(rev_vocab)) else data_utils._UNK
+    if isinstance(word, bytes):
+      word = word.decode()
+    return word
+
 
 
 def softmax(x):
@@ -102,7 +103,7 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
       return [{"dec_inp": greedy_dec(output_logits, rev_vocab), 'prob': 1}]
 
     # Get output logits for the sentence.
-    beams, new_beams, results = [(1, {'eos': 0, 'dec_inp': decoder_inputs, 'prob': 1, 'prob_ts': 1, 'prob_t': 1})], [], [] # initialize beams as (log_prob, empty_string, eos)
+    beams, new_beams, results = [(1, 0, {'eos': 0, 'dec_inp': decoder_inputs, 'prob': 1, 'prob_ts': 1, 'prob_t': 1})], [], [] # initialize beams as (log_prob, empty_string, eos)
     dummy_encoder_inputs = [np.array([data_utils.PAD_ID]) for _ in range(len(encoder_inputs))]
     
     for dptr in range(len(decoder_inputs)-1):
@@ -111,7 +112,7 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
         beams, new_beams = new_beams[:args.beam_size], []
       if debug: print("=====[beams]=====", beams)
       heapq.heapify(beams)  # since we will remove something
-      for prob, cand in beams:
+      for prob, _, cand in beams:
         if cand['eos']: 
           results += [(prob, cand)]
           continue
@@ -145,18 +146,23 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
             'prob_t'  : cand['prob_t'] * all_prob_t[c],
             'prob'    : cand['prob'] * all_prob[c],
           }
-          new_cand = (new_cand['prob'], new_cand) # for heapq can only sort according to list[0]
+          new_cand = (new_cand['prob'], random(), new_cand) # stuff a random to prevent comparing new_cand
           
-          if (len(new_beams) < args.beam_size):
-            heapq.heappush(new_beams, new_cand)
-          elif (new_cand[0] > new_beams[0][0]):
-            heapq.heapreplace(new_beams, new_cand)
+          try:
+            if (len(new_beams) < args.beam_size):
+              heapq.heappush(new_beams, new_cand)
+            elif (new_cand[0] > new_beams[0][0]):
+              heapq.heapreplace(new_beams, new_cand)
+          except Exception as e:
+            print("[Error]", e)
+            print("-----[new_beams]-----\n", new_beams)
+            print("-----[new_cand]-----\n", new_cand)
     
     results += new_beams  # flush last cands
 
     # post-process results
     res_cands = []
-    for prob, cand in sorted(results, reverse=True):
+    for prob, _, cand in sorted(results, reverse=True):
       cand['dec_inp'] = " ".join([dict_lookup(rev_vocab, w) for w in cand['dec_inp']])
       res_cands.append(cand)
     return res_cands

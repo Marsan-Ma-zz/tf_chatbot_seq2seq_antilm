@@ -116,8 +116,10 @@ def basic_tokenizer(sentence, en_jieba=False):
   else:
     words = []
     for space_separated_fragment in sentence.strip().split():
-      words.extend(re.split(_WORD_SPLIT, space_separated_fragment))
-    tokens = [w.lower() for w in words if w]
+      if isinstance(space_separated_fragment, str):
+        space_separated_fragment = space_separated_fragment.encode()
+      words.extend(_WORD_SPLIT.split(space_separated_fragment))
+    return [w.lower() for w in words if w]
   return tokens
 
 
