@@ -133,7 +133,7 @@ class Seq2SeqModel(object):
         cell = tf.contrib.rnn.MultiRNNCell([single_cell() for _ in range(num_layers)])
 
       # The seq2seq function: we use embedding for the input and attention.
-      def seq2seq_f(encoder_inputs, decoder_inputs, do_decode):
+      def seq2seq_f(encoder_inputs, decoder_inputs, feed_previous):
         return tf_seq2seq.embedding_attention_seq2seq(
             encoder_inputs, 
             decoder_inputs, 
@@ -142,7 +142,7 @@ class Seq2SeqModel(object):
             num_decoder_symbols=target_vocab_size,
             embedding_size=size,
             output_projection=output_projection,
-            feed_previous=do_decode,
+            feed_previous=feed_previous, #do_decode,
             dtype=dtype)
 
       # Feeds for inputs.
@@ -185,22 +185,23 @@ class Seq2SeqModel(object):
             for output in self.outputs[b]
         ]
         
-      # external loss overwrite while reinforcement learning
-      self.tvars = tf.trainable_variables()
+      # Gradients and SGD update operation for training the model.
+      params = tf.trainable_variables()
+      # if not forward_only:
       self.gradient_norms = []
       self.updates = []
-      self.advantage = [tf.placeholder(tf.float32, name="advantage_%i" % i) for i in range(len(buckets))]
+      self.advantage = [tf.placeholder(tf.float32, name="advantage_%i" % i) for i in xrange(len(buckets))]
       opt = tf.train.GradientDescentOptimizer(self.learning_rate)
       for b in xrange(len(buckets)):
-        adjusted_losses = tf.subtract(self.losses[b], self.advantage[b])
-        gradients = tf.gradients(adjusted_losses, self.tvars)
+        self.losses[b] = tf.subtract(self.losses[b], self.advantage[b])
+        gradients = tf.gradients(self.losses[b], params)
         clipped_gradients, norm = tf.clip_by_global_norm(gradients,
                                                          max_gradient_norm)
         self.gradient_norms.append(norm)
         self.updates.append(opt.apply_gradients(
-            zip(clipped_gradients, self.tvars), global_step=self.global_step))
+            zip(clipped_gradients, params), global_step=self.global_step))
 
-      # self.saver = tf.train.Saver(tf.all_variables())
+      all_variables = tf.global_variables()
       all_variables = [k for k in tf.global_variables() if k.name.startswith(self.scope_name)]
       self.saver = tf.train.Saver(all_variables)
 
@@ -242,7 +243,7 @@ class Seq2SeqModel(object):
     # Input feed: encoder inputs, decoder inputs, target_weights, as provided.
     input_feed = {
       self.force_dec_input.name:  force_dec_input,
-      self.en_output_proj:        (not training),
+      self.en_output_proj.name:   (not training),
     }
     for l in xrange(len(self.buckets)):
       input_feed[self.advantage[l].name] = advantage[l] if advantage else 0

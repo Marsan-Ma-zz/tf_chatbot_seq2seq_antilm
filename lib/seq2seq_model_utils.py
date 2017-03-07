@@ -83,7 +83,7 @@ def get_predicted_sentence(args, input_sentence, vocab, rev_vocab, model, sess, 
       if data_utils.EOS_ID in selected_token_ids:
         eos = selected_token_ids.index(data_utils.EOS_ID)
         selected_token_ids = selected_token_ids[:eos]
-      output_sentence = ' '.join([rev_vocab[t] for t in selected_token_ids])
+      output_sentence = ' '.join([dict_lookup(rev_vocab, t) for t in selected_token_ids])
       return output_sentence
 
     input_token_ids = data_utils.sentence_to_token_ids(input_sentence, vocab)

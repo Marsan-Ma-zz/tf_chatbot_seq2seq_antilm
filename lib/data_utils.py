@@ -40,7 +40,8 @@ UNK_ID = 3
 # Regular expressions used to tokenize.
 #_WORD_SPLIT = re.compile(b"([.,!?\"':;，。！)(])")
 _WORD_SPLIT = re.compile(b"([.,!?\"':;)(])")
-_DIGIT_RE = re.compile(br"\d{3,}")
+# _DIGIT_RE = re.compile(br"\d{3,}")
+_DIGIT_RE = re.compile(br"\d")
 
 def get_dialog_train_set_path(path):
   return os.path.join(path, 'chat')
@@ -113,6 +114,7 @@ def basic_tokenizer(sentence, en_jieba=False):
   """Very basic tokenizer: split the sentence into a list of tokens."""
   if en_jieba:
     tokens = list([w.lower() for w in jieba.cut(sentence) if w not in [' ']])
+    return tokens
   else:
     words = []
     for space_separated_fragment in sentence.strip().split():
@@ -120,7 +122,7 @@ def basic_tokenizer(sentence, en_jieba=False):
         space_separated_fragment = space_separated_fragment.encode()
       words.extend(_WORD_SPLIT.split(space_separated_fragment))
     return [w.lower() for w in words if w]
-  return tokens
+  
 
 
 def create_vocabulary(vocabulary_path, data_path, max_vocabulary_size,

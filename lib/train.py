@@ -110,7 +110,8 @@ def train(args):
             # Run evals on development set and print their perplexity.
             for bucket_id in xrange(len(args.buckets)):
               encoder_inputs, decoder_inputs, target_weights = model.get_batch(dev_set, bucket_id)
-              _, eval_loss, _ = model.step(sess, encoder_inputs, decoder_inputs, target_weights, bucket_id)
+              _, eval_loss, _ = model.step(sess, encoder_inputs, decoder_inputs, 
+                                          target_weights, bucket_id, training=False, force_dec_input=False)
 
               eval_ppx = math.exp(eval_loss) if eval_loss < 300 else float('inf')
               print("  eval: bucket %d perplexity %.2f" % (bucket_id, eval_ppx))
