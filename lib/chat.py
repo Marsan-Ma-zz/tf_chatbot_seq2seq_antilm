@@ -31,7 +31,7 @@ def chat(args):
         else:
             print(sentence, ' -> ', predicted_sentence)
             
-        print("> ")
+        sys.stdout.write("> ")
         sys.stdout.flush()
         sentence = sys.stdin.readline()
 

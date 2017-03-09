@@ -1,8 +1,11 @@
 # Tensorflow chatbot
-### (with seq2seq + attention + dict-compress + beam search + anti-LM + deep reinforcement learning + facebook messenger server)
+### (with seq2seq + attention + dict-compress + beam search + anti-LM + facebook messenger server)
 
 
-> Update-2017-03-06: upgrade to tensorflow v1.0.0, no backward compatible since too much have changed in tensorflow.
+> ####[Update 2017-03-09]
+> 1. Upgrade to tensorflow v1.0.0, no backward compatible since tensorflow have changed so much.   
+> 2. A pre-trained model using twitter corpus is added, just `./go_example` and you are ready to try it in interactive chat mode!  
+> 3. You could start from tracing this `go_example` script to know how things work!
 
 
 ## Briefing
@@ -78,6 +81,8 @@ Here's an interesting comparison: The left conversation enabled beam search with
 
 
 ## Deep reinforcement learning
+
+> [Update 2017-03-09] Reinforcement learning does not work now, wait for fix.
 
 If you want some chance to further improve your model, here I implemented a reinforcement learning architecture inspired by [Li et al., 2016][b3]. Just enable the reinforce_learn option in `config.py`, you might want to add your own rule in `step_rf()` function in `lib/seq2seq_mode.py`. 
 

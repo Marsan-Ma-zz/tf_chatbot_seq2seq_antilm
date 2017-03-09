@@ -867,7 +867,6 @@ def embedding_attention_seq2seq(encoder_inputs,
       output_size = num_decoder_symbols
 
     if isinstance(feed_previous, bool):
-      print("[DEBUG] feed_previous is bool")
       outputs, state = embedding_attention_decoder(
           decoder_inputs,
           encoder_state,
@@ -884,7 +883,6 @@ def embedding_attention_seq2seq(encoder_inputs,
 
     # If feed_previous is a Tensor, we construct 2 graphs and use cond.
     def decoder(feed_previous_bool):
-      print("[DEBUG] feed_previous is tensor:", feed_previous_bool)
       reuse = None if feed_previous_bool else True
       with variable_scope.variable_scope(
           variable_scope.get_variable_scope(), reuse=reuse) as scope:
