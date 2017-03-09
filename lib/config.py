@@ -17,7 +17,7 @@ def params_setup(cmdline=None):
 
   parser.add_argument('--vocab_size', type=int, default=50000, help='Dialog vocabulary size.')
   parser.add_argument('--size', type=int, default=128, help='Size of each model layer.')
-  parser.add_argument('--num_layers', type=int, default=3, help='Number of layers in the model.')
+  parser.add_argument('--num_layers', type=int, default=4, help='Number of layers in the model.')
 
   parser.add_argument('--max_train_data_size', type=int, default=0, help='Limit on the size of training data (0: no limit)')
   parser.add_argument('--steps_per_checkpoint', type=int, default=500, help='How many training steps to do per checkpoint')

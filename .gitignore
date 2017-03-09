@@ -6,3 +6,5 @@ go_*
 *.yaml
 ssl/*
 lib/old
+lib/foward_only
+lib/foward_only_tensor

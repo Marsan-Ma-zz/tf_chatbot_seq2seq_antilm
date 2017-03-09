@@ -867,6 +867,7 @@ def embedding_attention_seq2seq(encoder_inputs,
       output_size = num_decoder_symbols
 
     if isinstance(feed_previous, bool):
+      print("[DEBUG] feed_previous is bool")
       outputs, state = embedding_attention_decoder(
           decoder_inputs,
           encoder_state,
@@ -883,6 +884,7 @@ def embedding_attention_seq2seq(encoder_inputs,
 
     # If feed_previous is a Tensor, we construct 2 graphs and use cond.
     def decoder(feed_previous_bool):
+      print("[DEBUG] feed_previous is tensor:", feed_previous_bool)
       reuse = None if feed_previous_bool else True
       with variable_scope.variable_scope(
           variable_scope.get_variable_scope(), reuse=reuse) as scope:
@@ -1047,8 +1049,8 @@ def one2many_rnn_seq2seq(encoder_inputs,
   return outputs_dict, state_dict
 
 
-def sequence_loss_by_example(logits,
-                             targets,
+def sequence_loss_by_example(targets,
+                             logits,
                              weights,
                              average_across_timesteps=True,
                              softmax_loss_function=None,
@@ -1097,8 +1099,8 @@ def sequence_loss_by_example(logits,
   return log_perps
 
 
-def sequence_loss(logits,
-                  targets,
+def sequence_loss(targets,
+                  logits,
                   weights,
                   average_across_timesteps=True,
                   average_across_batch=True,
@@ -1126,8 +1128,8 @@ def sequence_loss(logits,
   with ops.name_scope(name, "sequence_loss", logits + targets + weights):
     cost = math_ops.reduce_sum(
         sequence_loss_by_example(
-            logits,
             targets,
+            logits,
             weights,
             average_across_timesteps=average_across_timesteps,
             softmax_loss_function=softmax_loss_function))
@@ -1207,15 +1209,15 @@ def model_with_buckets(encoder_inputs,
         if per_example_loss:
           losses.append(
               sequence_loss_by_example(
-                  outputs[-1],
                   targets[:bucket[1]],
+                  outputs[-1],
                   weights[:bucket[1]],
                   softmax_loss_function=softmax_loss_function))
         else:
           losses.append(
               sequence_loss(
-                  outputs[-1],
                   targets[:bucket[1]],
+                  outputs[-1],
                   weights[:bucket[1]],
                   softmax_loss_function=softmax_loss_function))
 
