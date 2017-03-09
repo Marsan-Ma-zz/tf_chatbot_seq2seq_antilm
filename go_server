@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# python3 app.py --mode test --model_name 17live_comments --vocab_size 200000 --antilm 0.7
+
+python3 app.py --mode test --model_name twitter_en --vocab_size 100000 --antilm 0.7

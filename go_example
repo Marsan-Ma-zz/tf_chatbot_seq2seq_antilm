@@ -1,0 +1,24 @@
+#!/bin/bash
+
+NOW=$(date +"%Y%m%d_%H%M")
+PY3='stdbuf -o0 nohup python3 -u'
+mkdir -p logs
+
+if [ ! -d ./works/example/nn_models ]; then
+    wget https://github.com/Marsan-Ma/tf_chatbot_pretrained_model/raw/master/example_model.tar.gz
+    tar -zxvf example_model.tar.gz
+fi
+
+#=============================
+#   Example Twitter Corpus
+#=============================
+# 1. train model
+# python3 main.py --mode train --model_name example --vocab_size 50000
+$PY3 main.py --mode train --model_name example --vocab_size 100000 > "./logs/seq2seq_twitter_en_$NOW.log" &
+
+# 2. chat interactively in command line
+# python3 main.py --mode chat --model_name example --vocab_size 100000 # --beam_size 5 --antilm 0.7
+
+# 3. do batch output test
+# python3 main.py --mode test --model_name example --vocab_size 100000 --beam_size 5 --antilm 0.7
+

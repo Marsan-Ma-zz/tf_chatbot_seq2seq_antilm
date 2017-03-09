@@ -4,7 +4,7 @@
 
 > ####[Update 2017-03-09]
 > 1. Upgrade to tensorflow v1.0.0, no backward compatible since tensorflow have changed so much.   
-> 2. A pre-trained model using twitter corpus is added, just `./go_example` and you are ready to try it in interactive chat mode!  
+> 2. A pre-trained model using twitter corpus is added, just `./go_example` to chat!  
 > 3. You could start from tracing this `go_example` script to know how things work!
 
 

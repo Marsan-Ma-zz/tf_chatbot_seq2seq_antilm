@@ -2,7 +2,7 @@ sftp-config.json
 *.pyc
 works/*
 !works/lyrics_ptt
-go_*
+go_train
 *.yaml
 ssl/*
 lib/old

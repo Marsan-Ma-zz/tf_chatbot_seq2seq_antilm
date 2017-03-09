@@ -15,8 +15,8 @@ def params_setup(cmdline=None):
   parser.add_argument('--max_gradient_norm', type=float, default=5.0, help='Clip gradients to this norm.')
   parser.add_argument('--batch_size', type=int, default=64, help='Batch size to use during training.')
 
-  parser.add_argument('--vocab_size', type=int, default=50000, help='Dialog vocabulary size.')
-  parser.add_argument('--size', type=int, default=128, help='Size of each model layer.')
+  parser.add_argument('--vocab_size', type=int, default=100000, help='Dialog vocabulary size.')
+  parser.add_argument('--size', type=int, default=256, help='Size of each model layer.')
   parser.add_argument('--num_layers', type=int, default=4, help='Number of layers in the model.')
 
   parser.add_argument('--max_train_data_size', type=int, default=0, help='Limit on the size of training data (0: no limit)')
