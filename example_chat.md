@@ -1,6 +1,6 @@
 ## 2017.03.14
 
-This is a chat history for the demo model of [tf_chatbot_seq2seq_antilm](https://github.com/Marsan-Ma/tf_chatbot_seq2seq_antilm/blob/master/example_chat.md).
+This is a chat history for the demo model of [tf_chatbot_seq2seq_antilm](https://github.com/Marsan-Ma/tf_chatbot_seq2seq_antilm).
 
 You could use `./go_example` to get exactly the same model and same result, you could also try `beam_search` and `antiLM` by uncomment the option in `go_example`.
 
