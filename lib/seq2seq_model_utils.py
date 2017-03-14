@@ -36,8 +36,10 @@ def create_model(session, args, forward_only=True):
   ckpt = tf.train.get_checkpoint_state(args.model_dir)
   # if ckpt and gfile.Exists(ckpt.model_checkpoint_path):
   if ckpt and ckpt.model_checkpoint_path:
+    tstart = datetime.now()
     print("Reading model parameters from %s" % ckpt.model_checkpoint_path)
     model.saver.restore(session, ckpt.model_checkpoint_path)
+    print("It takes %i secs to load the model" % datetime.now() - tstart)
   else:
     print("Created model with fresh parameters.")
     session.run(tf.global_variables_initializer())

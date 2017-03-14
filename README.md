@@ -2,10 +2,10 @@
 ### (with seq2seq + attention + dict-compress + beam search + anti-LM + facebook messenger server)
 
 
-> ####[Update 2017-03-09]
+> ####[Update 2017-03-14]
 > 1. Upgrade to tensorflow v1.0.0, no backward compatible since tensorflow have changed so much.   
-> 2. A pre-trained model using twitter corpus is added, just `./go_example` to chat!  
-> 3. You could start from tracing this `go_example` script to know how things work!
+> 2. A demo model pre-trained with twitter corpus is available, just `./go_example` to chat! (or preview my chat example [here](https://github.com/Marsan-Ma/tf_chatbot_seq2seq_antilm/blob/master/example_chat.md))
+> 3. You could start from tracing the `go_example` script to know how things work!
 
 
 ## Briefing
