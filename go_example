@@ -15,7 +15,6 @@ fi
 #   Example Twitter Corpus
 #=============================
 # 1. train model
-# python3 main.py --mode train --model_name example --vocab_size 50000 --size 128
 # $PY3 main.py --mode train --model_name example --vocab_size 100000 --size 128 > "./logs/seq2seq_twitter_en_$NOW.log" &
 
 # 2. chat interactively in command line
