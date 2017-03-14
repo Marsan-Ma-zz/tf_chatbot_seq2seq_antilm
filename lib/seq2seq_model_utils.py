@@ -39,7 +39,7 @@ def create_model(session, args, forward_only=True):
     tstart = datetime.now()
     print("Reading model parameters from %s" % ckpt.model_checkpoint_path)
     model.saver.restore(session, ckpt.model_checkpoint_path)
-    print("It takes %i secs to load the model" % datetime.now() - tstart)
+    print("It takes %s secs to load the model" % datetime.now() - tstart)
   else:
     print("Created model with fresh parameters.")
     session.run(tf.global_variables_initializer())
