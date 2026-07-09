@@ -41,7 +41,7 @@ class ChatBot(object):
         self.FBM_API = "https://graph.facebook.com/v2.6/me/messages"
         with open("config.yaml", 'rt') as stream:
             try:
-                cfg = yaml.load(stream)
+                cfg = yaml.safe_load(stream)
                 self.FACEBOOK_TOKEN = cfg.get('FACEBOOK_TOKEN')
                 self.VERIFY_TOKEN = cfg.get('VERIFY_TOKEN')
             except yaml.YAMLError as exc:
